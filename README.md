@@ -1,3 +1,5 @@
+<img width="600" height="300" alt="image" src="https://github.com/user-attachments/assets/cb91a944-d03e-4b92-b1bb-3d573712eeb7" />
+
 # luci-app-conntrack
 
 [English](#english) | [中文说明](#中文说明)

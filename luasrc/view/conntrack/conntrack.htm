@@ -2,7 +2,7 @@
 <style type="text/css">
 	.fixed-table {
 		width: 100%;
-		table-layout: fixed !important;
+	/*	table-layout: fixed !important; */
 		border-collapse: collapse;
 	}
 	.text-ellipsis {
@@ -27,6 +27,25 @@
 	.unit-toggle:hover {
 		background: #e0e0e0;
 		border-color: #999;
+	}
+	.table-responsive-wrapper {
+		width: 100%;
+		overflow-x: auto !important;
+		-webkit-overflow-scrolling: touch;
+		margin-bottom: 15px;
+	}
+	.conntrack-table th, .conntrack-table td {
+		white-space: nowrap !important;
+	}
+	@media screen and (min-width: 992px) {
+		.ip-col-limit {
+			max-width: 260px !important;
+		}
+	}
+	@media screen and (max-width: 991px) {
+		.ip-col-limit {
+			max-width: 180px !important;
+		}
 	}
 </style>
 
@@ -91,8 +110,8 @@
 			<tr class="cbi-section-table-titles">
 				<th class="cbi-section-table-cell" style="width:8%;"><%:L3%></th>
 				<th class="cbi-section-table-cell" style="width:10%;"><%:Protocol%></th>
-				<th class="cbi-section-table-cell" style="width:17%;"><%:State (Direction)%></th>
-				<th class="cbi-section-table-cell" style="width:23%;"><%:Source IP:Port%></th>
+				<th class="cbi-section-table-cell text-ellipsis ip-col-limit" style="width:17%;"><%:State (Direction)%></th>
+				<th class="cbi-section-table-cell text-ellipsis ip-col-limit" style="width:23%;"><%:Source IP:Port%></th>
 				<th class="cbi-section-table-cell" style="width:23%;"><%:Destination IP:Port%></th>
 				<th class="cbi-section-table-cell" style="width:11%;"><%:Accumulated%></th>
 				<th class="cbi-section-table-cell" style="width:11%;">
@@ -157,8 +176,8 @@
 			var c1 = row.insertCell(1); c1.className = 'text-ellipsis'; c1.innerHTML = '<strong>' + conn.proto.toUpperCase() + '</strong>'; c1.title = conn.proto.toUpperCase();
 			var c2 = row.insertCell(2); c2.className = 'text-ellipsis'; c2.innerHTML = conn.state; c2.title = conn.state;
 			
-			var c3 = row.insertCell(3); c3.className = 'text-ellipsis'; c3.innerHTML = src_full; c3.title = src_full;
-			var c4 = row.insertCell(4); c4.className = 'text-ellipsis'; c4.innerHTML = dst_full; c4.title = dst_full;
+			var c3 = row.insertCell(3); c3.className = 'text-ellipsis ip-col-limit'; c3.innerHTML = src_full; c3.title = src_full;
+			var c4 = row.insertCell(4); c4.className = 'text-ellipsis ip-col-limit'; c4.innerHTML = dst_full; c4.title = dst_full;
 			
 			var c5 = row.insertCell(5); c5.className = 'text-ellipsis'; c5.innerHTML = formatBytes(conn.bytes); c5.title = formatBytes(conn.bytes);
 			var c6 = row.insertCell(6); c6.className = 'text-ellipsis'; c6.innerHTML = '<span style="color:#468847; font-weight:bold;">' + speedStr + '</span>'; c6.title = speedStr;

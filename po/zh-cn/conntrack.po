@@ -1,0 +1,47 @@
+msgid "ConnTrack"
+msgstr "连接跟踪"
+
+msgid "ConnTrack Connection Monitor"
+msgstr "ConnTrack 连接实时监视器"
+
+msgid "Realtime single-direction traffic speed flow based on Event-Stream (SSE)."
+msgstr "基于 Event-Stream (SSE) 长连接架构的单向实时网速/协议审计看板。"
+
+msgid "Interval (Seconds)"
+msgstr "采样刷新时间间隔"
+
+msgid "Display Rows"
+msgstr "屏幕显示最大行数"
+
+msgid "Actual Delta Time"
+msgstr "内核实际采样物理间隔"
+
+msgid "L3"
+msgstr "网络层"
+
+msgid "Protocol"
+msgstr "传输协议"
+
+msgid "State (Direction)"
+msgstr "连接状态 (单向流量方向)"
+
+msgid "Source IP:Port"
+msgstr "源 IP 地址 : 端口号"
+
+msgid "Destination IP:Port"
+msgstr "目的 IP 地址 : 端口号"
+
+msgid "Accumulated"
+msgstr "该方向累计消耗流量"
+
+msgid "Current Speed"
+msgstr "当前方向即时网速"
+
+msgid "Connecting to Event-Stream..."
+msgstr "正在安全握手并建立 Event-Stream 毫秒级长连接数据通道..."
+
+msgid "No active traffic speed detected..."
+msgstr "当前暂无活跃网速的大流量连接，表格已自动过滤零速率空闲链..."
+
+msgid "Stream connection lost, retrying..."
+msgstr "Event-Stream 连接意外被系统或网页剥离，正在疯狂尝试自动重新重连..."

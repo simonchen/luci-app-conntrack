@@ -7,8 +7,10 @@ LUCI_PKGARCH:=all
 LUCI_MINIFY:=0
 
 PKG_NAME:=luci-app-conntrack
-PKG_VERSION:=1.0.0
+PKG_VERSION:=1.0.1
 PKG_RELEASE:=1
+
+PKG_MAINTAINER:=simonchen <xinyi78528@163.com>
 
 include $(TOPDIR)/feeds/luci/luci.mk
 

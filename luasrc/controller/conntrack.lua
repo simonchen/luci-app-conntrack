@@ -17,6 +17,7 @@ function action_stream()
 	local max_rows = tonumber(http.formvalue("rows")) or 50
 	local filter_src = http.formvalue("filter_src") or "all"
 	local filter_dst = http.formvalue("filter_dst") or "all"
+	local filter_local = http.formvalue("filter_local") or "false"
 
 	local lan_prefix = "192.168.1."
 	local lan_ip = luci.util.exec("uci -q get network.lan.ipaddr"):gsub("%s+", "")
@@ -59,6 +60,16 @@ function action_stream()
 		return sec + (usec / 1000000)
 	end
 
+	local function is_local_ip(ip)
+		if not ip then return true end
+		local clean_ip = ip:lower():gsub("%s+", "")
+		if clean_ip == "127.0.0.1" or clean_ip == "0.0.0.0" or clean_ip == "::1" or clean_ip == "::" then return true end
+		if clean_ip:gsub("0", "") == ":::::::1" or clean_ip:gsub("0", "") == "::::::::" then return true end
+		if clean_ip:find("^192%.168%.") or clean_ip:find("^10%.") or clean_ip:find("^172%.1[6-9]%.") or clean_ip:find("^172%.2%d%.") or clean_ip:find("^172%.3[01]%.") then return true end
+		if clean_ip:find("^[fe][e89ab]%d%d") or clean_ip:find("^[fc][cd]%d%d") then return true end
+		return false
+	end
+
 	local last_connections = {}
 	local last_timestamp = get_current_time()
 
@@ -92,6 +103,9 @@ function action_stream()
 						display_proto = "quic"
 					end
 
+				      if filter_local == "true" and ((is_local_ip(src1) and is_local_ip(dst1)) or (is_local_ip(src2) and is_local_ip(dst2))) then
+						-- do nothing
+				      else
 					ip_map[src1] = true
 					ip_map[dst1] = true
 					ip_map[src2] = true
@@ -104,7 +118,7 @@ function action_stream()
 					if pass_orig then
 						local key_orig = string.format("%s_%s_%s:%s->%s:%s_ORIG", layer3, display_proto, src1, sport1, dst1, dport1)
 						current_connections[key_orig] = {
-							l3 = layer3, proto = display_proto, state = state .. "(正向)",
+							l3 = layer3, proto = display_proto, state = state,
 							src = src1, sport = sport1, dst = dst1, dport = dport1, bytes = tonumber(bytes1), speed = 0
 						}
 					end
@@ -116,10 +130,11 @@ function action_stream()
 					if pass_repl then
 						local key_repl = string.format("%s_%s_%s:%s->%s:%s_REPL", layer3, display_proto, src2, sport2, dst2, dport2)
 						current_connections[key_repl] = {
-							l3 = layer3, proto = display_proto, state = state .. "(反向)",
+							l3 = layer3, proto = display_proto, state = state,
 							src = src2, sport = sport2, dst = dst2, dport = dport2, bytes = tonumber(bytes2), speed = 0
 						}
 					end
+				      end
 				end
 			end
 		end
@@ -133,7 +148,11 @@ function action_stream()
 					local diff = curr.bytes - prev.bytes
 					curr.speed = diff >= 0 and math.floor(diff / delta_time) or 0
 				else
-					curr.speed = 0
+					if curr.proto == "udp" or curr.proto == "quic" then
+						curr.speed = math.floor(curr.bytes / delta_time) or 0
+					else
+						curr.speed = 0
+					end
 				end
 			end
 		end

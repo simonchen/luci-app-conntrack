@@ -164,13 +164,45 @@
 
 	function isLocalIp(ip) {
 		if (!ip) return true;
-		if (ip === '127.0.0.1' || ip === '0.0.0.0' || ip === '::1') return true;
-		if (ip.replace(/0/g, '') === ':::::::1') return true;
-		var v4Pattern = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/;
-		if (v4Pattern.test(ip)) return true;
-		var v6Pattern = /^[fF][eEcCdD][89aAbB0123]/;
-		if (v6Pattern.test(ip)) return true;
+		let clean = ip.toLowerCase().replace(/[\s\[\]]/g, '');
+		if (clean === '127.0.0.1' || clean === '0.0.0.0' || clean === '::1' || clean === '::') return true;
+		if (clean.replace(/0/g, '') === ':::::::1' || clean.replace(/0/g, '') === '::::::::') return true;
+		if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(clean)) return true;
+		if (/^f[cd]/.test(clean)) return true;
+		if (/^fe[89ab]/.test(clean)) return true;
 		return false;
+	}
+
+	function fastNormalizeIP(ip) {
+		if (!ip) return '';
+		let clean = ip.toLowerCase().replace(/[\s\[\]]/g, '');
+		if (clean.includes('.') && !clean.includes(':')) {
+			return ip.trim();
+		}
+		if (clean.startsWith('::ffff:') && clean.includes('.')) {
+			return clean.substring(7);
+		}
+		let parts = [];
+		if (clean.includes('::')) {
+			const sides = clean.split('::');
+			const left = sides[0] ? sides[0].split(':') : [];
+			const right = sides[1] ? sides[1].split(':') : [];
+			const missingCount = 8 - (left.length + right.length);
+			parts = [...left, ...Array(missingCount).fill('0000'), ...right];
+		} else {
+			parts = clean.split(':');
+		}
+		for (let i = 0; i < parts.length; i++) {
+			let segment = parts[i] || '0000';
+			if (segment.length < 4) {
+				segment = segment.padStart(4, '0');
+			}
+			parts[i] = segment;
+		}
+		while (parts.length < 8) {
+			parts.push('0000');
+		}
+		return parts.slice(0, 8).join(':');
 	}
 
 	var geoIpTimer = null;
@@ -231,7 +263,7 @@
 			if (!results) return;
 			results.forEach(function(json) {
 				if (json && json.status === 'success') {
-					var queryIp = json.query;
+					var queryIp = fastNormalizeIP(json.query);
 					var region = json.country + ' ' + (json.regionName || '') + ' ' + (json.city || '') + ' (' + (json.isp || '') + ')';
 					var flagHtml = '';
 					if (json.countryCode && json.countryCode.length === 2) {

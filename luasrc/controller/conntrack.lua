@@ -62,11 +62,19 @@ function action_stream()
 
 	local function is_local_ip(ip)
 		if not ip then return true end
-		local clean_ip = ip:lower():gsub("%s+", "")
+		local clean_ip = ip:lower():gsub("%s+", ""):gsub("%[", ""):gsub("%]", "")
 		if clean_ip == "127.0.0.1" or clean_ip == "0.0.0.0" or clean_ip == "::1" or clean_ip == "::" then return true end
-		if clean_ip:gsub("0", "") == ":::::::1" or clean_ip:gsub("0", "") == "::::::::" then return true end
-		if clean_ip:find("^192%.168%.") or clean_ip:find("^10%.") or clean_ip:find("^172%.1[6-9]%.") or clean_ip:find("^172%.2%d%.") or clean_ip:find("^172%.3[01]%.") then return true end
-		if clean_ip:find("^[fe][e89ab]%d%d") or clean_ip:find("^[fc][cd]%d%d") then return true end
+		local no_zeros = clean_ip:gsub("0", "")
+		if no_zeros == ":::::::1" or no_zeros == "::::::::" then return true end
+		if clean_ip:find("^192%.168%.") or clean_ip:find("^10%.") or clean_ip:find("^172%.1[6-9]%.") or clean_ip:find("^172%.2%d%.") or clean_ip:find("^172%.3%.") then 
+			return true 
+		end
+		if clean_ip:find("^fc") or clean_ip:find("^fd") then 
+			return true 
+		end
+		if clean_ip:find("^fe[89ab]") then 
+			return true 
+		end
 		return false
 	end
 
@@ -159,9 +167,9 @@ function action_stream()
 
 		local sorted_list = {}
 		for _, conn in pairs(current_connections) do
-			if conn.speed > 0 then
+			-- if conn.speed > 0 then
 				table.insert(sorted_list, conn)
-			end
+			-- end
 		end
 
 		table.sort(sorted_list, function(a, b) return a.speed > b.speed end)

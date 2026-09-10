@@ -98,7 +98,7 @@ function action_stream()
 			if layer3 and (proto == "tcp" or proto == "udp") then
 				local state = "UNTRACKED"
 				if proto == "tcp" then
-					state = remain:match("^%d+%s+%d+%s+(%w+)") or "UNKNOWN"
+					state = remain:match("^%d+%s+%d+%s+([%w_]+)") or "UNKNOWN"
 				end
 
 				local src1, dst1, sport1, dport1, bytes1, src2, dst2, sport2, dport2, bytes2 = remain:match(
@@ -111,9 +111,16 @@ function action_stream()
 						display_proto = "quic"
 					end
 
-				      if filter_local == "true" and ((is_local_ip(src1) and is_local_ip(dst1)) or (is_local_ip(src2) and is_local_ip(dst2))) then
+				      if filter_local == "true" and is_local_ip(src1) and is_local_ip(dst1) then
 						-- do nothing
 				      else
+					if layer3 == "ipv4" then
+						-- IPv4 DNAT revert --
+						if src2 == lan_ip then src2 = dst1 end
+						-- IPv4 SNAT revert --
+						if dst2 ~= src1 then dst2 = src1 end
+					end
+
 					ip_map[src1] = true
 					ip_map[dst1] = true
 					ip_map[src2] = true

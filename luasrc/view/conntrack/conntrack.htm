@@ -39,12 +39,12 @@
 	}
 	@media screen and (min-width: 992px) {
 		.ip-col-limit {
-			max-width: 260px !important;
+			max-width: 160px !important;
 		}
 	}
 	@media screen and (max-width: 991px) {
 		.ip-col-limit {
-			max-width: 180px !important;
+			max-width: 120px !important;
 		}
 	}
 </style>
@@ -110,9 +110,17 @@
 			<tr class="cbi-section-table-titles">
 				<th class="cbi-section-table-cell" style="width:8%;"><%:L3%></th>
 				<th class="cbi-section-table-cell" style="width:10%;"><%:Protocol%></th>
-				<th class="cbi-section-table-cell text-ellipsis ip-col-limit" style="width:17%;"><%:State (Direction)%></th>
-				<th class="cbi-section-table-cell text-ellipsis ip-col-limit" style="width:23%;"><%:Source IP:Port%></th>
-				<th class="cbi-section-table-cell" style="width:23%;"><%:Destination IP:Port%></th>
+				<th class="cbi-section-table-cell" style="width:17%;"><%:State (Direction)%></th>
+				<th class="cbi-section-table-cell text-ellipsis ip-col-limit" style="width:23%;">
+					<select id="filter_src_select" style="width:120px; padding:2px; font-weight:bold; color:#333; border:1px solid #ccc; border-radius:3px;">
+						<option value="all" selected><%:Source IP:Port%></option>
+					</select>
+				</th>
+				<th class="cbi-section-table-cell text-ellipsis ip-col-limit" style="width:23%;">
+					<select id="filter_dst_select" style="width:120px; padding:2px; font-weight:bold; color:#333; border:1px solid #ccc; border-radius:3px;">
+						<option value="all" selected><%:Destination IP:Port%></option>
+					</select>
+				</th>
 				<th class="cbi-section-table-cell" style="width:11%;"><%:Accumulated%></th>
 				<th class="cbi-section-table-cell" style="width:11%;">
 					<%:Current Speed%><span id="toggle_btn" class="unit-toggle">Bit</span>
@@ -127,6 +135,11 @@
 	var eventSource = null;
 	var currentUnit = 'Bit';
 	var lastCacheData = null;
+	var localIsSrcFocus = false;
+	var localIsDstFocus = false;
+	var isSrcOpen = false;
+	var isDstOpen = false;
+	var globalHostMap = {};
 
 	function formatSpeed(bytesPerSec) {
 		if (currentUnit === 'Bit') {
@@ -146,6 +159,24 @@
 		if (bytes >= 1024 * 1024 * 1024) return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
 		if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB';
 		return (bytes / 1024).toFixed(2) + ' KB';
+	}
+
+	function updateFilterOptions(selectId, ipList, currentValue) {
+		var select = document.getElementById(selectId);
+		var defaultText = select.options[0] ? select.options[0].text : (selectId === 'filter_src_select' ? '<%:Source IP:Port%>' : '<%:Destination IP:Port%>');
+		select.options.length = 0;
+		var defaultOpt = document.createElement('option');
+		defaultOpt.value = 'all'; defaultOpt.text = defaultText;
+		if (currentValue === 'all') defaultOpt.selected = true;
+		select.appendChild(defaultOpt);
+		ipList.forEach(function(ip) {
+			var opt = document.createElement('option');
+			opt.value = ip;
+			var host = globalHostMap[ip];
+			opt.text = host ? ip + ' (' + host + ')' : ip;
+			if (ip === currentValue) opt.selected = true;
+			select.appendChild(opt);
+		});
 	}
 
 	function renderTable(data) {
@@ -168,16 +199,21 @@
 			var row = table.insertRow(-1);
 			row.className = 'cbi-section-table-row';
 
-			var src_full = conn.src + ':' + conn.sport;
-			var dst_full = conn.dst + ':' + conn.dport;
+			var src_host = globalHostMap[conn.src];
+			var dst_host = globalHostMap[conn.dst];
+			var src_display = src_host ? src_host + ':' + conn.sport : conn.src + ':' + conn.sport;
+			var dst_display = dst_host ? dst_host + ':' + conn.dport : conn.dst + ':' + conn.dport;
+			var src_title = conn.src + ':' + conn.sport + (src_host ? ' (' + src_host + ')' : '');
+			var dst_title = conn.dst + ':' + conn.dport + (dst_host ? ' (' + dst_host + ')' : '');
+
 			var speedStr = formatSpeed(conn.speed);
 
 			var c0 = row.insertCell(0); c0.className = 'text-ellipsis'; c0.innerHTML = conn.l3.toUpperCase(); c0.title = conn.l3.toUpperCase();
 			var c1 = row.insertCell(1); c1.className = 'text-ellipsis'; c1.innerHTML = '<strong>' + conn.proto.toUpperCase() + '</strong>'; c1.title = conn.proto.toUpperCase();
 			var c2 = row.insertCell(2); c2.className = 'text-ellipsis'; c2.innerHTML = conn.state; c2.title = conn.state;
 			
-			var c3 = row.insertCell(3); c3.className = 'text-ellipsis ip-col-limit'; c3.innerHTML = src_full; c3.title = src_full;
-			var c4 = row.insertCell(4); c4.className = 'text-ellipsis ip-col-limit'; c4.innerHTML = dst_full; c4.title = dst_full;
+			var c3 = row.insertCell(3); c3.className = 'text-ellipsis ip-col-limit'; c3.innerHTML = src_display; c3.title = src_title;
+			var c4 = row.insertCell(4); c4.className = 'text-ellipsis ip-col-limit'; c4.innerHTML = dst_display; c4.title = dst_title;
 			
 			var c5 = row.insertCell(5); c5.className = 'text-ellipsis'; c5.innerHTML = formatBytes(conn.bytes); c5.title = formatBytes(conn.bytes);
 			var c6 = row.insertCell(6); c6.className = 'text-ellipsis'; c6.innerHTML = '<span style="color:#468847; font-weight:bold;">' + speedStr + '</span>'; c6.title = speedStr;
@@ -191,7 +227,11 @@
 
 		var interval = document.getElementById('interval_select').value;
 		var rows = document.getElementById('rows_select').value;
-		var url = '<%=luci.dispatcher.build_url("admin", "network", "conntrack_stream")%>' + '?interval=' + interval + '&rows=' + rows;
+		var filterSrc = document.getElementById('filter_src_select').value;
+		var filterDst = document.getElementById('filter_dst_select').value;
+
+		var url = '<%=luci.dispatcher.build_url("admin", "network", "conntrack_stream")%>' + 
+			'?interval=' + interval + '&rows=' + rows + '&filter_src=' + filterSrc + '&filter_dst=' + filterDst;
 
 		eventSource = new EventSource(url);
 
@@ -200,10 +240,17 @@
 			if (loading) loading.style.display = 'none';
 
 			var data = JSON.parse(event.data);
+			if (data.host_map) { globalHostMap = data.host_map; }
 			document.getElementById('delta_label').innerHTML = data.delta + 's';
 			lastCacheData = data;
 
-			renderTable(data);
+			if (!localIsSrcFocus && !localIsDstFocus) {
+				var currentSrc = document.getElementById('filter_src_select').value;
+				var currentDst = document.getElementById('filter_dst_select').value;
+				updateFilterOptions('filter_src_select', data.unique_ips, currentSrc);
+				updateFilterOptions('filter_dst_select', data.unique_ips, currentDst);
+				renderTable(data);
+			}
 		};
 
 		eventSource.onerror = function(err) {
@@ -231,6 +278,44 @@
 
 	document.getElementById('interval_select').addEventListener('change', startStream);
 	document.getElementById('rows_select').addEventListener('change', startStream);
+	
+	document.getElementById('filter_src_select').addEventListener('change', function() {
+		isSrcOpen = false;
+		this.blur();
+		localIsSrcFocus = false;
+		startStream();
+	});
+
+	document.getElementById('filter_dst_select').addEventListener('change', function() {
+		isDstOpen = false;
+		this.blur();
+		localIsDstFocus = false;
+		startStream();
+	});
+
+	document.getElementById('filter_src_select').addEventListener('click', function() {
+		isSrcOpen = !isSrcOpen;
+		if (!isSrcOpen) { this.blur(); }
+	});
+
+	document.getElementById('filter_src_select').addEventListener('blur', function() {
+		isSrcOpen = false;
+	});
+
+	document.getElementById('filter_dst_select').addEventListener('click', function() {
+		isDstOpen = !isDstOpen;
+		if (!isDstOpen) { this.blur(); }
+	});
+
+	document.getElementById('filter_dst_select').addEventListener('blur', function() {
+		isDstOpen = false;
+	});
+
+	document.getElementById('filter_src_select').addEventListener('focus', function() { localIsSrcFocus = true; });
+	document.getElementById('filter_src_select').addEventListener('blur', function() { localIsSrcFocus = false; });
+	document.getElementById('filter_dst_select').addEventListener('focus', function() { localIsDstFocus = true; });
+	document.getElementById('filter_dst_select').addEventListener('blur', function() { localIsDstFocus = false; });
+
 	window.addEventListener('DOMContentLoaded', startStream);
 //]]></script>
 <%+footer%>

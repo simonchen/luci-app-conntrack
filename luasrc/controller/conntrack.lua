@@ -15,6 +15,33 @@ function action_stream()
 
 	local interval = tonumber(http.formvalue("interval")) or 1000
 	local max_rows = tonumber(http.formvalue("rows")) or 50
+	local filter_src = http.formvalue("filter_src") or "all"
+	local filter_dst = http.formvalue("filter_dst") or "all"
+
+	local lan_prefix = "192.168.1."
+	local lan_ip = luci.util.exec("uci -q get network.lan.ipaddr"):gsub("%s+", "")
+	if lan_ip and lan_ip ~= "" then
+		if lan_ip:match("^192%.168%.") or lan_ip:match("^10%.") or lan_ip:match("^172%.") then
+			lan_prefix = lan_ip:match("^([%d%.]+%.)%d+$") or "192.168.1."
+		end
+	end
+
+	local lease_map = {}
+	local lf = io.open("/tmp/dhcp.leases", "r")
+	if lf then
+		for line in lf:lines() do
+			local ip, host = line:match("^%d+%s+[%a%d%:]+%s+([%d%.]+)%s+([%w%-_]+)")
+			if ip and host and host ~= "*" then
+				lease_map[ip] = host
+			end
+		end
+		lf:close()
+	end
+	local sys_host = luci.util.exec("uci -q get system.@system[0].hostname"):gsub("%s+", "")
+	if sys_host == "" then sys_host = "lan" end
+	if lan_ip and lan_ip ~= "" then
+		lease_map[lan_ip] = sys_host
+	end
 
 	if interval < 500 then interval = 500 end
 	if interval > 10000 then interval = 10000 end
@@ -42,6 +69,7 @@ function action_stream()
 
 		local current_timestamp = get_current_time()
 		local current_connections = {}
+		local ip_map = {}
 		
 		local f = io.open("/proc/net/nf_conntrack", "r")
 		if not f then break end
@@ -64,17 +92,34 @@ function action_stream()
 						display_proto = "quic"
 					end
 
-					local key_orig = string.format("%s_%s_%s:%s->%s:%s_ORIG", layer3, display_proto, src1, sport1, dst1, dport1)
-					current_connections[key_orig] = {
-						l3 = layer3, proto = display_proto, state = state .. "(正向)",
-						src = src1, sport = sport1, dst = dst1, dport = dport1, bytes = tonumber(bytes1), speed = 0
-					}
+					ip_map[src1] = true
+					ip_map[dst1] = true
+					ip_map[src2] = true
+					ip_map[dst2] = true
 
-					local key_repl = string.format("%s_%s_%s:%s->%s:%s_REPL", layer3, display_proto, src2, sport2, dst2, dport2)
-					current_connections[key_repl] = {
-						l3 = layer3, proto = display_proto, state = state .. "(反向)",
-						src = src2, sport = sport2, dst = dst2, dport = dport2, bytes = tonumber(bytes2), speed = 0
-					}
+					local pass_orig = true
+					if filter_src ~= "all" and src1 ~= filter_src then pass_orig = false end
+					if filter_dst ~= "all" and dst1 ~= filter_dst then pass_orig = false end
+
+					if pass_orig then
+						local key_orig = string.format("%s_%s_%s:%s->%s:%s_ORIG", layer3, display_proto, src1, sport1, dst1, dport1)
+						current_connections[key_orig] = {
+							l3 = layer3, proto = display_proto, state = state .. "(正向)",
+							src = src1, sport = sport1, dst = dst1, dport = dport1, bytes = tonumber(bytes1), speed = 0
+						}
+					end
+
+					local pass_repl = true
+					if filter_src ~= "all" and src2 ~= filter_src then pass_repl = false end
+					if filter_dst ~= "all" and dst2 ~= filter_dst then pass_repl = false end
+
+					if pass_repl then
+						local key_repl = string.format("%s_%s_%s:%s->%s:%s_REPL", layer3, display_proto, src2, sport2, dst2, dport2)
+						current_connections[key_repl] = {
+							l3 = layer3, proto = display_proto, state = state .. "(反向)",
+							src = src2, sport = sport2, dst = dst2, dport = dport2, bytes = tonumber(bytes2), speed = 0
+						}
+					end
 				end
 			end
 		end
@@ -107,9 +152,34 @@ function action_stream()
 			table.insert(output_list, sorted_list[i])
 		end
 
+		local lan_ips = {}
+		local v4_ips = {}
+		local v6_ips = {}
+		local lan_pattern = "^" .. lan_prefix:gsub("%.", "%%.")
+
+		for ip in pairs(ip_map) do
+			if ip:find(":") then
+				table.insert(v6_ips, ip)
+			elseif ip:match(lan_pattern) then
+				table.insert(lan_ips, ip)
+			else
+				table.insert(v4_ips, ip)
+			end
+		end
+		table.sort(lan_ips)
+		table.sort(v4_ips)
+		table.sort(v6_ips)
+
+		local unique_ips = {}
+		for _, ip in ipairs(lan_ips) do table.insert(unique_ips, ip) end
+		for _, ip in ipairs(v4_ips) do table.insert(unique_ips, ip) end
+		for _, ip in ipairs(v6_ips) do table.insert(unique_ips, ip) end
+
 		local response = {
 			delta = string.format("%.4f", delta_time),
-			connections = output_list
+			connections = output_list,
+			unique_ips = unique_ips,
+			host_map = lease_map
 		}
 
 		local json_str = jsonc.stringify(response)

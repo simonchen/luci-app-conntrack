@@ -20,8 +20,9 @@ A highly-optimized, lightweight **Realtime Connection Tracking & Network Audit M
   * **Original/Reply Traffic Splitting:** Tears apart conntrack rows to display precise directional analytics (TX/RX isolation).
   * **QUIC/HTTP3 Recognition:** Automatically sniffs out modern HTTP/3 streams via UDP 443 heuristic auditing.
   * **Adaptive Layout with Tooltips:** Prevents UI breakage from long IPv6 addresses using CSS ellipsis combined with native hover tooltips.
-  * **IP filter** supported.
+  * **Specific IP / Local & Loopback IP filter** supported.
   * **Local host name** supported.
+  * **GeoIP info** supported.
 
 ### 🛠️ Architecture & Directory Tree
 
@@ -68,8 +69,9 @@ make package/feeds/luci/luci-app-conntrack/compile V=s
   * **正反单向流量分离：** 将 conntrack 报文拆分为 Original（发起方）与 Reply（回应方），实现真正的单向 TX/RX 独立审计与降序排列。
   * **QUIC / HTTP3 智能识别：** 基于启发式行为审计，自动将隐藏在 UDP 443 端口下的现代高并发视频/下载流标记并显示为 `QUIC` 协议。
   * **超长 IPv6 弹性布局：** 引入 CSS 精确截断裁切，使超长 IPv6 地址自动变为省略号，鼠标悬停时原生 Tooltip 气泡自动浮现完整内容，排版永不撑破。
-  * **IP 过滤支持**
+  * **手动指定IP或本地以及回环IP 过滤支持**
   * **本地主机名显示支持**
+  * **地理IP信息显示支持**
 
 ### 🧱 依赖与安装
 

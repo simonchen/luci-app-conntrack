@@ -1,4 +1,4 @@
-<img width="600" height="300" alt="image" src="https://github.com/user-attachments/assets/cb91a944-d03e-4b92-b1bb-3d573712eeb7" />
+<img width="750" height="400" alt="image" src="https://github.com/user-attachments/assets/fdd8b243-608f-4522-abcc-40ce645c249f" />
 
 # luci-app-conntrack
 
@@ -19,6 +19,7 @@ A highly-optimized, lightweight **Realtime Connection Tracking & Network Audit M
   * **Bit / B Unit Toggling:** Seamlessly switch between `Bit` (bps/Mbps) and `B` (B/s/MB/s) locally via JS without dropping the SSE pipeline.
   * **Original/Reply Traffic Splitting:** Tears apart conntrack rows to display precise directional analytics (TX/RX isolation).
   * **QUIC/HTTP3 Recognition:** Automatically sniffs out modern HTTP/3 streams via UDP 443 heuristic auditing.
+  * **IPv4/v6 double stacks** supported.
   * **Adaptive Layout with Tooltips:** Prevents UI breakage from long IPv6 addresses using CSS ellipsis combined with native hover tooltips.
   * **Specific IP / Local & Loopback IP filter** supported.
   * **Local host name** supported.
@@ -68,6 +69,7 @@ make package/feeds/luci/luci-app-conntrack/compile V=s
   * **前端零延迟单位切换：** 表头集成智能交互按钮，支持在 `Bit`（比特率，Mbps）和 `B`（字节率，MB/s）之间 1 毫秒无缝切换，无需掐断或重启后台长连接。
   * **正反单向流量分离：** 将 conntrack 报文拆分为 Original（发起方）与 Reply（回应方），实现真正的单向 TX/RX 独立审计与降序排列。
   * **QUIC / HTTP3 智能识别：** 基于启发式行为审计，自动将隐藏在 UDP 443 端口下的现代高并发视频/下载流标记并显示为 `QUIC` 协议。
+  * **IPv4/v6 双栈支持**
   * **超长 IPv6 弹性布局：** 引入 CSS 精确截断裁切，使超长 IPv6 地址自动变为省略号，鼠标悬停时原生 Tooltip 气泡自动浮现完整内容，排版永不撑破。
   * **手动指定IP或本地以及回环IP 过滤支持**
   * **本地主机名显示支持**

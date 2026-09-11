@@ -399,10 +399,13 @@
 		});
 	}
 
+	var streamRestartTimer = null;
 	function startStream() {
 		if (eventSource) {
 			eventSource.close();
 		}
+
+		if (streamRestartTimer) { clearTimeout(streamRestartTimer); streamRestartTimer = null; }
 
 		var interval = document.getElementById('interval_select').value;
 		var rows = document.getElementById('rows_select').value;
@@ -416,6 +419,13 @@
 		eventSource = new EventSource(url);
 
 		eventSource.onmessage = function(event) {
+			if (!streamRestartTimer) {
+				streamRestartTimer = setTimeout(function() {
+					streamRestartTimer = null;
+					startStream();
+				}, 1800000);
+			}
+
 			var loading = document.getElementById('loading_msg');
 			if (loading) loading.style.display = 'none';
 

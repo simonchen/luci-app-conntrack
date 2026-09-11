@@ -47,4 +47,4 @@ msgid "Stream connection lost, retrying..."
 msgstr "Event-Stream 连接意外被系统或网页剥离，正在疯狂尝试自动重新重连..."
 
 msgid "Filter Local/Loopback"
-msgstr "过滤本地或回环IP"
+msgstr "过滤本地或回环连接"

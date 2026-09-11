@@ -24,6 +24,7 @@ A highly-optimized, lightweight **Realtime Connection Tracking & Network Audit M
   * **Specific IP / Local & Loopback IP filter** supported.
   * **Local host name** supported.
   * **GeoIP info** supported.
+  * **Experiment feature** Show app name(YouTube, Instagram, TikTok, etc.) associated with the connection, this will need to patch kmod-nf-conntrack (patch file: 999-netfilter-custom-payload-telemetry-nf_conntrack.patch).
 
 ### 🛠️ Architecture & Directory Tree
 
@@ -74,7 +75,8 @@ make package/feeds/luci/luci-app-conntrack/compile V=s
   * **手动指定IP或本地以及回环IP 过滤支持**
   * **本地主机名显示支持**
   * **地理IP信息显示支持**
-
+  * **实验特色** 显示与连接相关的应用名称(YouTube, Instagram, TikTok, 王者荣耀..), 你需要给内核模块 kmod-nf-conntrack 打补丁 (补丁文件: 999-netfilter-custom-payload-telemetry-nf_conntrack.patch).
+  * 
 ### 🧱 依赖与安装
 
 本插件在 OpenWrt 源码树下的标准相对路径为 `package/feeds/luci/luci-app-conntrack`：

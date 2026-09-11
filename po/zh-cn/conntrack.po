@@ -7,6 +7,15 @@ msgstr "ConnTrack 连接实时监视器"
 msgid "Realtime single-direction traffic speed flow based on Event-Stream (SSE)."
 msgstr "基于 Event-Stream (SSE) 长连接架构的单向实时网速/协议审计看板。"
 
+msgid "To show AppName, you'll need to patch kmod-nf-conntrack, please refers to"
+msgstr "想查看应用名称, 你需要给内核模块kmod-nf-connntrack打补丁, 详见"
+
+msgid "AppName"
+msgstr "应用名称"
+
+msgid "Show AppName (experiment)"
+msgstr "显示应用名称 (实验)"
+
 msgid "Interval (Seconds)"
 msgstr "采样刷新时间间隔"
 
@@ -48,3 +57,24 @@ msgstr "Event-Stream 连接意外被系统或网页剥离，正在疯狂尝试�
 
 msgid "Filter Local/Loopback"
 msgstr "过滤本地或回环连接"
+
+msgid "Honor of Kings"
+msgstr "王者荣耀"
+
+msgid "YouTube"
+msgstr "油管"
+
+msgid "TikTok"
+msgstr "抖音"
+
+msgid "Tencent Video"
+msgstr "腾讯视频"
+
+msgid "X (Twitter)"
+msgstr "X (推特)"
+
+msgid "Instagram"
+msgstr "INS 照片墙"
+
+msgid "HTTPS Connection"
+msgstr "HTTPS 连接"

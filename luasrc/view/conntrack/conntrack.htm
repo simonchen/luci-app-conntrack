@@ -58,7 +58,7 @@
 
 <div class="cbi-map">
 	<h2 class="title"><%:ConnTrack%></h2>
-	<div class="cbi-map-descr"><%:Realtime single-direction traffic speed flow based on Event-Stream (SSE).%></div>
+	<div class="cbi-map-descr"><%:Realtime single-direction traffic speed flow based on Event-Stream (SSE).%><br /><%:To show AppName, you'll need to patch kmod-nf-conntrack, please refers to%><a href="https://github.com/simonchen/luci-app-conntrack" target="_blank"> Github luci-app-conntrack</a></div>
 	
 	<fieldset class="cbi-section">
 		<div class="cbi-section-node">
@@ -116,6 +116,10 @@
 						<input type="checkbox" checked id="filter_local_checkbox" style="margin: 0 6px 0 0; padding: 0; width: 14px; height: 14px; display: inline-block; vertical-align: middle;" />
 						<span style="display: inline-block; vertical-align: middle; line-height: 14px;"><%:Filter Local/Loopback%></span>
 					</label>
+                                        <label style="font-weight: bold; cursor: pointer; user-select: none; display: flex; align-items: center; margin:0 15px; height: 100%;">
+                                                <input type="checkbox" id="show_appname_checkbox" style="margin: 0 6px 0 0; padding: 0; width: 14px; height: 14px; display:
+                                                <span style="display: inline-block; vertical-align: middle; line-height: 14px;"><%:Show AppName (experiment)%></span>
+                                        </label>
 				</div>
 			</div>
 		</div>
@@ -141,6 +145,7 @@
 				<th class="cbi-section-table-cell" style="width:11%;">
 					<%:Current Speed%><span id="toggle_btn" class="unit-toggle">Bit</span>
 				</th>
+				<th id="th_appname" class="cbi-section-table-cell text-ellipsis ip-col-limit" style="width:11%;"><%:AppName%></th>
 			</tr>
 			<tr class="cbi-section-table-row"><td colspan="7" style="text-align:center;" id="loading_msg"><%:Connecting to Event-Stream...%></td></tr>
 		</table>
@@ -161,6 +166,33 @@
 	var geoIpQueue = [];
 	var isGeoIpProcessing = false;
 	var queuedIpMap = {};
+
+	const appMapper = {
+		"0102b75000000001": "<%:Honor of Kings%>",
+		
+		getAppName: function(payload, geoInfo) {
+			if (!payload) return "";
+			
+			const prefix = payload.substring(0, 6);
+			const org = geoInfo && geoInfo.as ? geoInfo.as.toLowerCase() : "";
+
+			// Intercept standard TLS (160301 / 160303) handshakes and match via ASN
+			if (prefix === "160301" || prefix === "160303") {
+				if (org.includes("google") || org.includes("youtube")) return "<%:YouTube%>";
+				if (org.includes("bytedance") || org.includes("tiktok")) return "<%:TikTok%>";
+				if (org.includes("tencent") || org.includes("qq")) return "<%:Tencent Video%>";
+				if (org.includes("bilibili")) return "<%:Bilibili%>";
+				if (org.includes("netflix")) return "<%:Netflix%>";
+				if (org.includes("twitter") || org.includes("x corp")) return "<%:X (Twitter)%>";
+				if (org.includes("instagram") || org.includes("facebook") || org.includes("meta")) return "<%:Instagram%>";
+			
+				var org_as = geoInfo ? (geoInfo.org || geoInfo.as) : "";	
+				return org_as ? org_as : "<%:HTTPS Connection%>";
+			}
+			
+			return "";
+		}
+	};
 
 	function isLocalIp(ip) {
 		if (!ip) return true;
@@ -206,14 +238,14 @@
 	}
 
 	var geoIpTimer = null;
-	function fetchGeoIp(ip, srcId, dstId) {
+	function fetchGeoIp(ip, srcId, dstId, payload) {
 		if (isLocalIp(ip)) return;
 		if (geoIpCache[ip]) {
 			applyGeoIpToDom(ip, srcId, dstId);
 			return;
 		}
 		if (!queuedIpMap[ip]) queuedIpMap[ip] = [];
-		queuedIpMap[ip].push({ srcId: srcId, dstId: dstId });
+		queuedIpMap[ip].push({ srcId: srcId, dstId: dstId, payload: payload });
 		if (geoIpQueue.indexOf(ip) === -1) geoIpQueue.push(ip);
 		
 		if (geoIpTimer) clearTimeout(geoIpTimer);
@@ -270,9 +302,24 @@
 						var code = json.countryCode.toLowerCase();
 						flagHtml = '<span class="fi fi-' + code + ' ct-flag-inline"></span>';
 					}
-					geoIpCache[queryIp] = { region: region, flagHtml: flagHtml };
+					var appName = "";
+					if (queuedIpMap[queryIp]) {
+						var payload = queuedIpMap[queryIp][0].payload;
+						if (payload) {
+							appName = appMapper[payload];
+							if (!appName) appName = appMapper.getAppName(payload, json);
+							//if (appName && !(appName in appMapper)) appMapper[payload] = appName;
+							var payload_elems = document.querySelectorAll(`[payload="{payload}"]`);
+							payload_elems.forEach(function(elem) { elem.innerHTML = elem.title = appName; });
+						}
+					}
+					geoIpCache[queryIp] = { region: region, flagHtml: flagHtml, appName: appName };
 					var targets = queuedIpMap[queryIp] || [];
 					targets.forEach(function(t) { applyGeoIpToDom(queryIp, t.srcId, t.dstId); });
+					delete queuedIpMap[queryIp];
+				}
+				if (json && json.status == 'fail') {
+					var queryIp = fastNormalizeIP(json.query);
 					delete queuedIpMap[queryIp];
 				}
 			});
@@ -346,7 +393,7 @@
 		});
 	}
 
-	function renderTable(data) {
+	function renderTable(data, showAppName) {
 		var table = document.getElementById('conntrack_table');
 		while (table.rows.length > 1) {
 			table.deleteRow(1);
@@ -391,11 +438,26 @@
 			if (geoIpCache[conn.src]) { applyGeoIpToDom(conn.src, src_dom_id, dst_dom_id); }
 			if (geoIpCache[conn.dst]) { applyGeoIpToDom(conn.dst, src_dom_id, dst_dom_id); }
 
-			if (!src_host) { fetchGeoIp(conn.src, src_dom_id, dst_dom_id); }
-			if (!dst_host) { fetchGeoIp(conn.dst, src_dom_id, dst_dom_id); }
+			if (!src_host) { fetchGeoIp(conn.src, src_dom_id, dst_dom_id, conn.payload); }
+			if (!dst_host) { fetchGeoIp(conn.dst, src_dom_id, dst_dom_id, conn.payload); }
 	
 			var c5 = row.insertCell(5); c5.className = 'text-ellipsis'; c5.innerHTML = formatBytes(conn.bytes); c5.title = formatBytes(conn.bytes);
 			var c6 = row.insertCell(6); c6.className = 'text-ellipsis'; c6.innerHTML = '<span style="color:#468847; font-weight:bold;">' + speedStr + '</span>'; c6.title = speedStr;
+
+			var c7 = row.insertCell(7); c7.className = 'text-ellipsis ip-col-limit'; c7.style.display = showAppName ? '' : 'none';
+			var payload = conn.payload;
+			if (payload) {
+				c7.setAttribute("payload", payload);
+				if (appMapper[payload]) {
+			    		c7.innerHTML = c7.title = appMapper[payload];
+				} else if (geoIpCache[conn.src] && geoIpCache[conn.src].appName){
+					c7.innerHTML = c7.title = geoIpCache[conn.src].appName;
+				} else if (geoIpCache[conn.dst] && geoIpCache[conn.dst].appName){
+                                        c7.innerHTML = c7.title = geoIpCache[conn.dst].appName;
+				} else {
+			    		c7.innerHTML = "";
+				}
+			}
 		});
 	}
 
@@ -419,6 +481,9 @@
 		eventSource = new EventSource(url);
 
 		eventSource.onmessage = function(event) {
+			var showAppName = document.getElementById('show_appname_checkbox').checked ? true : false;
+			document.getElementById('th_appname').style.display = showAppName ? '' : 'none';
+
 			if (!streamRestartTimer) {
 				streamRestartTimer = setTimeout(function() {
 					streamRestartTimer = null;
@@ -439,7 +504,7 @@
 				var currentDst = document.getElementById('filter_dst_select').value;
 				updateFilterOptions('filter_src_select', data.unique_ips, currentSrc);
 				updateFilterOptions('filter_dst_select', data.unique_ips, currentDst);
-				renderTable(data);
+				renderTable(data, showAppName);
 			}
 		};
 

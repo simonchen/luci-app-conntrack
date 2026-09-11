@@ -101,11 +101,15 @@ function action_stream()
 					state = remain:match("^%d+%s+%d+%s+([%w_]+)") or "UNKNOWN"
 				end
 
-				local src1, dst1, sport1, dport1, bytes1, src2, dst2, sport2, dport2, bytes2 = remain:match(
-					"src=([%a%d%.%:]+).-dst=([%a%d%.%:]+).-sport=(%d+).-dport=(%d+).-bytes=(%d+).-src=([%a%d%.%:]+).-dst=([%a%d%.%:]+).-sport=(%d+).-dport=(%d+).-bytes=(%d+)"
+				local src1, dst1, sport1, dport1, bytes1, src2, dst2, sport2, dport2, bytes2, remain2 = remain:match(
+					"src=([%a%d%.%:]+).-dst=([%a%d%.%:]+).-sport=(%d+).-dport=(%d+).-bytes=(%d+).-src=([%a%d%.%:]+).-dst=([%a%d%.%:]+).-sport=(%d+).-dport=(%d+).-bytes=(%d+)%s+(.*)$"
 				)
 
 				if bytes1 and bytes2 then
+					-- NF_CONNTRACK module needs be patched for displaying payload
+					local payload = ""
+					if remain2 then payload = remain2:match("payload=(%x+)") or "" end
+
 					local display_proto = proto
 					if proto == "udp" and (sport1 == "443" or dport1 == "443" or sport2 == "443" or dport2 == "443") then
 						display_proto = "quic"
@@ -134,7 +138,7 @@ function action_stream()
 						local key_orig = string.format("%s_%s_%s:%s->%s:%s_ORIG", layer3, display_proto, src1, sport1, dst1, dport1)
 						current_connections[key_orig] = {
 							l3 = layer3, proto = display_proto, state = state,
-							src = src1, sport = sport1, dst = dst1, dport = dport1, bytes = tonumber(bytes1), speed = 0
+							src = src1, sport = sport1, dst = dst1, dport = dport1, bytes = tonumber(bytes1), speed = 0, payload = payload
 						}
 					end
 
@@ -146,7 +150,7 @@ function action_stream()
 						local key_repl = string.format("%s_%s_%s:%s->%s:%s_REPL", layer3, display_proto, src2, sport2, dst2, dport2)
 						current_connections[key_repl] = {
 							l3 = layer3, proto = display_proto, state = state,
-							src = src2, sport = sport2, dst = dst2, dport = dport2, bytes = tonumber(bytes2), speed = 0
+							src = src2, sport = sport2, dst = dst2, dport = dport2, bytes = tonumber(bytes2), speed = 0, payload = payload
 						}
 					end
 				      end
@@ -210,7 +214,7 @@ function action_stream()
 		for _, ip in ipairs(v6_ips) do table.insert(unique_ips, ip) end
 
 		local response = {
-			delta = string.format("%.4f", delta_time),
+			delta = string.format("%.2f", delta_time),
 			connections = output_list,
 			unique_ips = unique_ips,
 			host_map = lease_map

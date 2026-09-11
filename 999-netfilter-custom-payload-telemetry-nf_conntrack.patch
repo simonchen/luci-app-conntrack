@@ -1,0 +1,115 @@
+--- a/net/netfilter/Kconfig	2026-09-08 19:19:08.626477888 +0800
++++ b/net/netfilter/Kconfig	2026-09-11 12:51:21.318346650 +0800
+@@ -443,6 +443,20 @@
+ config NETFILTER_SYNPROXY
+ 	tristate
+ 
++config NF_CONNTRACK_CUSTOM_TELEMETRY
++	bool "Lightweight Layer 7 Payload Telemetry via conntrack"
++	depends on NF_CONNTRACK
++	default y
++	help
++	  This option intercepts the first payload-carrying packet of any 
++	  new connection (TCP/UDP) and stores its initial 8 bytes. This 
++	  data is then appended to the /proc/net/nf_conntrack stream.
++	  
++	  Perfect for lightweight gaming/video traffic identification 
++	  without running heavy user-space DPI tools.
++
++	  If unsure, say Y.
++
+ endif # NF_CONNTRACK
+ 
+ config NF_TABLES
+--- a/include/net/netfilter/nf_conntrack.h	2024-01-26 06:34:33.000000000 +0800
++++ b/include/net/netfilter/nf_conntrack.h	2026-09-11 12:55:51.762986649 +0800
+@@ -103,6 +103,15 @@
+ 	/* Extensions */
+ 	struct nf_ct_ext *ext;
+ 
++#if IS_ENABLED(CONFIG_NF_CONNTRACK_CUSTOM_TELEMETRY)
++	/*==================================================================
++	 * CUSTOM FIELDS FOR LIGHTWEIGHT L7 TELEMETRY (STRUCTURE SAFE)
++	 * Placed safely before the protocol union to avoid alignment bugs.
++	 *==================================================================*/
++	u8  init_payload[8];      /* Stores the first 8 bytes of L7 payload */
++	u8  has_custom_payload;   /* Boolean flag: 1 if payload was captured */
++#endif
++
+ 	/* Storage reserved for other modules, must be the last member */
+ 	union nf_conntrack_proto proto;
+ };
+--- a/net/netfilter/nf_conntrack_core.c	2026-09-08 19:19:08.626477888 +0800
++++ b/net/netfilter/nf_conntrack_core.c	2026-09-11 13:10:37.393456993 +0800
+@@ -1710,6 +1710,50 @@
+ 		goto out;
+ 	}
+ 
++#if IS_ENABLED(CONFIG_NF_CONNTRACK_CUSTOM_TELEMETRY)
++	/* =================== CUSTOM L7 TELEMETRY START =================== */
++	/* 1. Only process successfully accepted packets if the custom payload has not been extracted yet. */
++	if (ret == NF_ACCEPT && ct != NULL && !ct->has_custom_payload) {
++		struct iphdr *iph = ip_hdr(skb);
++		if (iph) {
++			unsigned int l4_header_len = 0;
++
++			/* 2. Determine L4 header length safely based on the protocol */
++			if (protonum == IPPROTO_TCP) {
++				struct tcphdr *th = tcp_hdr(skb);
++				if (th) {
++					l4_header_len = th->doff * 4;
++				}
++			} else if (protonum == IPPROTO_UDP) {
++				l4_header_len = 8;
++			}
++
++			/* 3. If L4 parsing succeeded, calculate the exact payload boundaries */
++			if (l4_header_len > 0) {
++				unsigned int payload_offset = dataoff + l4_header_len;
++				int payload_len = ntohs(iph->tot_len) - payload_offset;
++
++				/* 4. Only copy if there is actual Layer 7 data payload present */
++				if (payload_len > 0) {
++					u8 target_len = (payload_len > 8) ? 8 : payload_len;
++					u8 buffer[8] = {0};
++					u8 *ptr;
++
++					/* 5. Safe linear/non-linear header parsing tool to prevent kernel panics */
++					ptr = skb_header_pointer(skb, payload_offset, target_len, buffer);
++					if (ptr) {
++						/* Clear previous garbage memory and pull fresh data */
++						memset(ct->init_payload, 0, 8);
++						memcpy(ct->init_payload, ptr, target_len);
++						ct->has_custom_payload = 1;
++					}
++				}
++			}
++		}
++	}
++	/* ==================== CUSTOM L7 TELEMETRY END ==================== */
++#endif
++
+ 	if (ctinfo == IP_CT_ESTABLISHED_REPLY &&
+ 	    !test_and_set_bit(IPS_SEEN_REPLY_BIT, &ct->status))
+ 		nf_conntrack_event_cache(IPCT_REPLY, ct);
+--- a/net/netfilter/nf_conntrack_standalone.c	2026-09-08 19:19:08.314461253 +0800
++++ b/net/netfilter/nf_conntrack_standalone.c	2026-09-11 13:19:20.403310850 +0800
+@@ -369,6 +369,18 @@
+ 	ct_show_zone(s, ct, NF_CT_DEFAULT_ZONE_DIR);
+ 	ct_show_delta_time(s, ct);
+ 
++#if IS_ENABLED(CONFIG_NF_CONNTRACK_CUSTOM_TELEMETRY)
++	/* =================== CUSTOM L7 OUTPUT START =================== */
++	/* Safely iterate through the 8-byte array to output hex format */
++	if (ct->has_custom_payload) {
++		seq_printf(s, " payload=%02x%02x%02x%02x%02x%02x%02x%02x ",
++			   ct->init_payload[0], ct->init_payload[1],
++			   ct->init_payload[2], ct->init_payload[3],
++			   ct->init_payload[4], ct->init_payload[5],
++			   ct->init_payload[6], ct->init_payload[7]);
++	}
++	/* ==================== CUSTOM L7 OUTPUT END ==================== */
++#endif
+ 	seq_printf(s, "use=%u\n", atomic_read(&ct->ct_general.use));
+ 
+ 	if (seq_has_overflowed(s))

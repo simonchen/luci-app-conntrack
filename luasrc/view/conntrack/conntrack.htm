@@ -170,16 +170,39 @@
 	const appMapper = {
 		"0102b75000000001": "<%:Honor of Kings%>",
 		
-		getAppName: function(payload, geoInfo) {
+		getAppName: function(payload, geoInfo, bytes) {
 			if (!payload) return "";
 			
 			const prefix = payload.substring(0, 6);
 			const org = geoInfo && geoInfo.as ? geoInfo.as.toLowerCase() : "";
 
 			// Intercept standard TLS (160301 / 160303) handshakes and match via ASN
-			if (prefix === "160301" || prefix === "160303") {
-				if (org.includes("google") || org.includes("youtube")) return "<%:YouTube%>";
-				if (org.includes("bytedance") || org.includes("tiktok")) return "<%:TikTok%>";
+			if (payload.charAt(0) === 'c' && payload.substring(2, 6) === '0000') { // UDP(QUIC) feature with payload
+				if (org.includes("google") || org.includes("youtube")) {
+					return "<%:YouTube%>";
+				}
+				if (org.includes("akamai") || org.includes('fastly') || org.includes("bytedance") || org.includes("tiktok")) {
+					return "<%:TikTok%>";
+				}
+			}
+
+			if (prefix === "160301" || prefix === "160303") { // HTTPS feature (443 port)
+				if (org.includes("google") || org.includes("youtube")) {
+					if (bytes && bytes >= 4194304) { // at least 4MB to ensure..
+						return "<%:YouTube%>";
+					}
+					return "<%:Google Service%>";
+				}
+				if (org.includes("akamai") || org.includes('fastly') || org.includes("bytedance") || org.includes("tiktok")) {
+					if (bytes && bytes >= 2097152) { // at least 2MB to ensure..
+						return "<%:TikTok%>";
+					}
+				}
+				if (org.includes("unicom") || org.includes("telecom") || org.includes("chinanet") || org.includes("cmnet")) {
+					if (bytes && bytes >= 4194304) { // at least 4MB to ensure..
+						return "<%:Bilibili%>";
+					}
+				}
 				if (org.includes("tencent") || org.includes("qq")) return "<%:Tencent Video%>";
 				if (org.includes("bilibili")) return "<%:Bilibili%>";
 				if (org.includes("netflix")) return "<%:Netflix%>";
@@ -304,16 +327,17 @@
 					}
 					var appName = "";
 					if (queuedIpMap[queryIp]) {
-						var payload = queuedIpMap[queryIp][0].payload;
+						var arr = queuedIpMap[queryIp][0].payload.split('|');
+						var payload = arr[0], bytes = arr[1];
 						if (payload) {
 							appName = appMapper[payload];
-							if (!appName) appName = appMapper.getAppName(payload, json);
+							if (!appName) appName = appMapper.getAppName(payload, json, bytes);
 							//if (appName && !(appName in appMapper)) appMapper[payload] = appName;
 							var payload_elems = document.querySelectorAll(`[payload="{payload}"]`);
 							payload_elems.forEach(function(elem) { elem.innerHTML = elem.title = appName; });
 						}
 					}
-					geoIpCache[queryIp] = { region: region, flagHtml: flagHtml, appName: appName };
+					geoIpCache[queryIp] = { org: json.org, as: json.as, region: region, flagHtml: flagHtml, appName: appName };
 					var targets = queuedIpMap[queryIp] || [];
 					targets.forEach(function(t) { applyGeoIpToDom(queryIp, t.srcId, t.dstId); });
 					delete queuedIpMap[queryIp];
@@ -438,8 +462,8 @@
 			if (geoIpCache[conn.src]) { applyGeoIpToDom(conn.src, src_dom_id, dst_dom_id); }
 			if (geoIpCache[conn.dst]) { applyGeoIpToDom(conn.dst, src_dom_id, dst_dom_id); }
 
-			if (!src_host) { fetchGeoIp(conn.src, src_dom_id, dst_dom_id, conn.payload); }
-			if (!dst_host) { fetchGeoIp(conn.dst, src_dom_id, dst_dom_id, conn.payload); }
+			if (!src_host) { fetchGeoIp(conn.src, src_dom_id, dst_dom_id, conn.payload+'|'+conn.bytes); }
+			if (!dst_host) { fetchGeoIp(conn.dst, src_dom_id, dst_dom_id, conn.payload+'|'+conn.bytes); }
 	
 			var c5 = row.insertCell(5); c5.className = 'text-ellipsis'; c5.innerHTML = formatBytes(conn.bytes); c5.title = formatBytes(conn.bytes);
 			var c6 = row.insertCell(6); c6.className = 'text-ellipsis'; c6.innerHTML = '<span style="color:#468847; font-weight:bold;">' + speedStr + '</span>'; c6.title = speedStr;
@@ -447,16 +471,18 @@
 			var c7 = row.insertCell(7); c7.className = 'text-ellipsis ip-col-limit'; c7.style.display = showAppName ? '' : 'none';
 			var payload = conn.payload;
 			if (payload) {
+				var appName = "";
 				c7.setAttribute("payload", payload);
 				if (appMapper[payload]) {
-			    		c7.innerHTML = c7.title = appMapper[payload];
-				} else if (geoIpCache[conn.src] && geoIpCache[conn.src].appName){
-					c7.innerHTML = c7.title = geoIpCache[conn.src].appName;
-				} else if (geoIpCache[conn.dst] && geoIpCache[conn.dst].appName){
-                                        c7.innerHTML = c7.title = geoIpCache[conn.dst].appName;
-				} else {
-			    		c7.innerHTML = "";
+			    		appName = appMapper[payload];
+				} else if (geoIpCache[conn.src]){ // Revise appName by conn.bytes
+					appName = appMapper.getAppName(payload, geoIpCache[conn.src], conn.bytes);
+					if (appName) geoIpCache[conn.src].appName = appName;
+				} else if (geoIpCache[conn.dst]){ // Revise appName by conn.bytes
+					appName = appMapper.getAppName(payload, geoIpCache[conn.dst], conn.bytes);
+                                        if (appName) geoIpCache[conn.dst].appName = appName;
 				}
+				c7.innerHTML = c7.title = appName;
 			}
 		});
 	}

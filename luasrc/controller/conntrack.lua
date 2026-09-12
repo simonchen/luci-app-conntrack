@@ -27,21 +27,91 @@ function action_stream()
 		end
 	end
 
+        local function is_local_ip(ip)
+                if not ip then return true end
+                local clean_ip = ip:lower():gsub("%s+", ""):gsub("%[", ""):gsub("%]", "")
+                if clean_ip == "127.0.0.1" or clean_ip == "0.0.0.0" or clean_ip == "::1" or clean_ip == "::" then return true end
+                local no_zeros = clean_ip:gsub("0", "")
+                if no_zeros == ":::::::1" or no_zeros == "::::::::" then return true end
+                if clean_ip:find("^192%.168%.") or clean_ip:find("^10%.") or clean_ip:find("^172%.1[6-9]%.") or clean_ip:find("^172%.2%d%.") or clean_ip:find("^172%.3%.") then
+                        return true
+                end
+                if clean_ip:find("^fc") or clean_ip:find("^fd") then
+                        return true
+                end
+                if clean_ip:find("^fe[89ab]") then
+                        return true
+                end
+                return false
+        end
+
+	local function normalize_ipv6(ip)
+		if not ip or not ip:find(":") then return ip end
+		local clean_ip = ip:lower():gsub("%s+", "")
+		if clean_ip:find("::") then
+			local _, count = clean_ip:gsub(":", "")
+			local colons_to_add = 8 - count
+			local replacement = ":"
+			for i = 1, colons_to_add do replacement = replacement .. ":" end
+			clean_ip = clean_ip:gsub("::", replacement)
+		end
+		local parts = {}
+		for part in clean_ip:gmatch("([^:]+)") do
+			while #part < 4 do part = "0" .. part end
+			table.insert(parts, part)
+		end
+		while #parts < 8 do table.insert(parts, "0000") end
+		return table.concat(parts, ":")
+	end
+
 	local lease_map = {}
+	local mac_host_map = {}
+	local ipv6_mac_map = {}
+
 	local lf = io.open("/tmp/dhcp.leases", "r")
 	if lf then
 		for line in lf:lines() do
-			local ip, host = line:match("^%d+%s+[%a%d%:]+%s+([%d%.]+)%s+([%w%-_]+)")
+			local mac, ip, host = line:match("^%d+%s+([%a%d%:]+)%s+([%d%.%a%d%:]+)%s+([%w%-_]+)")
+			if not mac or not host then
+				ip, host = line:match("^%d+%s+[%a%d%:]+%s+([%d%.]+)%s+([%w%-_]+)")
+			end
 			if ip and host and host ~= "*" then
 				lease_map[ip] = host
+			end
+			if mac and host and host ~= "*" then
+				mac_host_map[mac:lower()] = host
 			end
 		end
 		lf:close()
 	end
+
 	local sys_host = luci.util.exec("uci -q get system.@system[0].hostname"):gsub("%s+", "")
 	if sys_host == "" then sys_host = "lan" end
 	if lan_ip and lan_ip ~= "" then
 		lease_map[lan_ip] = sys_host
+	end
+
+	-- adding ipv6 <-> host mapping
+	local np = io.popen("ip -6 neighbor | grep -E -v 'FAILED'")
+	if np then
+		for line in np:lines() do
+			local ip, mac = line:match("^([%a%d%:]+).-lladdr%s+([%a%d%:]+)")
+			if ip and mac then
+				local clean_ip = ip:lower():gsub("%s+", "")
+				if not is_local_ip(clean_ip) then
+					local norm_ip = normalize_ipv6(clean_ip)
+					ipv6_mac_map[norm_ip] = mac:lower()
+				end
+			end
+		end
+		np:close()
+	end
+
+	for ipv6, mac in pairs(ipv6_mac_map) do
+		local host = mac_host_map[mac]
+		if host then
+			lease_map[ipv6] = host
+		end
 	end
 
 	if interval < 500 then interval = 500 end
@@ -58,24 +128,6 @@ function action_stream()
 	local function get_current_time()
 		local sec, usec = nixio.gettimeofday()
 		return sec + (usec / 1000000)
-	end
-
-	local function is_local_ip(ip)
-		if not ip then return true end
-		local clean_ip = ip:lower():gsub("%s+", ""):gsub("%[", ""):gsub("%]", "")
-		if clean_ip == "127.0.0.1" or clean_ip == "0.0.0.0" or clean_ip == "::1" or clean_ip == "::" then return true end
-		local no_zeros = clean_ip:gsub("0", "")
-		if no_zeros == ":::::::1" or no_zeros == "::::::::" then return true end
-		if clean_ip:find("^192%.168%.") or clean_ip:find("^10%.") or clean_ip:find("^172%.1[6-9]%.") or clean_ip:find("^172%.2%d%.") or clean_ip:find("^172%.3%.") then 
-			return true 
-		end
-		if clean_ip:find("^fc") or clean_ip:find("^fd") then 
-			return true 
-		end
-		if clean_ip:find("^fe[89ab]") then 
-			return true 
-		end
-		return false
 	end
 
 	local last_connections = {}

@@ -255,7 +255,7 @@ span.iconify {
 			
 			const prefix = payload.substring(0, 6);
 			const org = geoInfo && geoInfo.as ? geoInfo.as.toLowerCase() : "";
-			org_as = geoInfo ? (geoInfo.org || geoInfo.as) : ""; org_as = org_as.replace(/^AS\d+\s+/ig, '');
+			org_as = geoInfo ? (geoInfo.as || geoInfo.org) : ""; org_as = org_as.replace(/^AS\d+\s+/ig, '');
 
 			// Intercept standard TLS (160301 / 160303) handshakes and match via ASN
 			if (payload.charAt(0) === 'c' && payload.substring(2, 6) === '0000') { // UDP(QUIC) feature with payload

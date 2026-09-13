@@ -182,34 +182,69 @@ span.iconify {
 	
 		iconifyIcon: function(org) {
 			if (!org) return "";
-			org = org.toLowerCase();
 
-			if (org == '<%:Honor of Kings%>')
+			if (org.match(/<%:Honor of Kings%>/i))
 				return 'logos:honorofkings';
-			if (org.includes('telegram'))
+			if (org.match(/telegram/i))
 				return 'logos:telegram';
-			if (org.includes('youtube') || org == '<%:YouTube%>')
+			if (org.match(/youtube/i) || org.match(/<%:YouTube%>/i))
 				return 'logos:youtube';
-			if (org.includes('azure'))
+			if (org.match(/azure/i))
 				return 'logos:azure';
-			if (org.includes('google'))
+			if (org.match(/google/i))
 				return 'logos:google';
-			if (org.includes('github'))
+			if (org.match(/github/i))
 				return 'logos:github';
-			if (org == '<%:TikTok%>')
+			if (org.match(/<%:TikTok%>/i))
 				return 'logos:tiktok';
+			if (org.match(/<%:Instagram%>/i))
+				return 'logos:instagram';
+			if (org.match(/facebook/i))
+				return 'logos:facebook';
+			if (org.match(/<%:X (Twitter)%>/i))
+				return 'logos:twittr';
+			if (org.match(/<%:Netflix%>/i))
+				return 'logos:netflix-icon';
+			if (org.match(/cloudflare/i))
+				return 'logos:cloudflare';
+			if (org.match(/aws/i))
+				return 'logos:aws';
+			if (org.match(/<%:Bilibili%>/i))
+				return 'ant-design:bilibili-filled';
+			if (org.match(/tencent/i) || org.match(/<%:Tencent Video%>/))
+				return 'thesvg-color:tencent';
+			if (org.match(/china unicom/i) || org.match(/unicom/i))
+				return 'arcticons:china-unicom';
+			if (org.match(/china telecom/i) || org.match(/telecom/i) || org.match(/chinanet/i))
+				return 'arcticons:china-telecom';
+			if (org.match(/china mobile/i))
+				return 'arcticons:china-mobile';
+			if (org.match(/aliyun/i))
+				return 'ant-design:aliyun-outlined';
+			if (org.match(/baidu/i))
+				return 'selfhst:baidu';
+			if (org.match(/microsoft/i))
+				return 'arcticons:microsoft';
 
 			return "";
 		},
 
 		renderIcon: function(icon, appName) {
-			if (!icon) return "";
+			if (!icon) return appName;
 
 			if (typeof(Iconify) != 'undefined') {
 				if (!Iconify.iconExists(icon)) {
 					Iconify.loadIcon(icon);
 				}
-				return Iconify.renderHTML(icon, {width:48, height:48}) || "";
+				var cp = {width:40, height:40};
+				var icon_data = Iconify.getIcon(icon);
+				if (icon_data) {
+					if (icon_data.width/icon_data.height >= 2 ||
+						icon_data.height/icon_data.width >= 2)
+						cp = {}
+				}
+				var html = Iconify.renderHTML(icon, cp) || "";
+				if (html) return html;
 			}
 
 			return appName;

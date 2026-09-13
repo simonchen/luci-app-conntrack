@@ -1,5 +1,15 @@
 <%+header%>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.3.2/css/flag-icons.min.css" />
+<script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+<script src="/luci-static/conntrack/js/iconify_custom_icons.js"></script>
+<style>
+span.iconify {
+	display:inline-block;
+	font-size:14px;
+	width: 32px;
+	height: 32px;
+}
+</style>
 <style type="text/css">
 	.ct-flag-inline {
 		margin-right: 6px;
@@ -169,12 +179,48 @@
 
 	const appMapper = {
 		"0102b75000000001": "<%:Honor of Kings%>",
-		
+	
+		iconifyIcon: function(org) {
+			if (!org) return "";
+			org = org.toLowerCase();
+
+			if (org == '<%:Honor of Kings%>')
+				return 'logos:honorofkings';
+			if (org.includes('telegram'))
+				return 'logos:telegram';
+			if (org.includes('youtube') || org == '<%:YouTube%>')
+				return 'logos:youtube';
+			if (org.includes('azure'))
+				return 'logos:azure';
+			if (org.includes('google'))
+				return 'logos:google';
+			if (org.includes('github'))
+				return 'logos:github';
+			if (org == '<%:TikTok%>')
+				return 'logos:tiktok';
+
+			return "";
+		},
+
+		renderIcon: function(icon, appName) {
+			if (!icon) return "";
+
+			if (typeof(Iconify) != 'undefined') {
+				if (!Iconify.iconExists(icon)) {
+					Iconify.loadIcon(icon);
+				}
+				return Iconify.renderHTML(icon, {width:48, height:48}) || "";
+			}
+
+			return appName;
+		},
+
 		getAppName: function(payload, geoInfo, bytes) {
 			if (!payload) return "";
 			
 			const prefix = payload.substring(0, 6);
 			const org = geoInfo && geoInfo.as ? geoInfo.as.toLowerCase() : "";
+			org_as = geoInfo ? (geoInfo.org || geoInfo.as) : ""; org_as = org_as.replace(/^AS\d+\s+/ig, '');
 
 			// Intercept standard TLS (160301 / 160303) handshakes and match via ASN
 			if (payload.charAt(0) === 'c' && payload.substring(2, 6) === '0000') { // UDP(QUIC) feature with payload
@@ -209,11 +255,10 @@
 				if (org.includes("twitter") || org.includes("x corp")) return "<%:X (Twitter)%>";
 				if (org.includes("instagram") || org.includes("facebook") || org.includes("meta")) return "<%:Instagram%>";
 			
-				var org_as = geoInfo ? (geoInfo.org || geoInfo.as) : "";	
 				return org_as ? org_as : "<%:HTTPS Connection%>";
 			}
 			
-			return "";
+			return org_as ? org_as : "";
 		}
 	};
 
@@ -325,19 +370,20 @@
 						var code = json.countryCode.toLowerCase();
 						flagHtml = '<span class="fi fi-' + code + ' ct-flag-inline"></span>';
 					}
-					var appName = "";
+					var appName = "", appIcon = "";
 					if (queuedIpMap[queryIp]) {
 						var arr = queuedIpMap[queryIp][0].payload.split('|');
 						var payload = arr[0], bytes = arr[1];
 						if (payload) {
 							appName = appMapper[payload];
 							if (!appName) appName = appMapper.getAppName(payload, json, bytes);
+							appIcon = appMapper.iconifyIcon(appName);
 							//if (appName && !(appName in appMapper)) appMapper[payload] = appName;
 							var payload_elems = document.querySelectorAll(`[payload="{payload}"]`);
-							payload_elems.forEach(function(elem) { elem.innerHTML = elem.title = appName; });
+							payload_elems.forEach(function(elem) { elem.innerHTML = appMapper.renderIcon(appIcon, appName); elem.title = appName; });
 						}
 					}
-					geoIpCache[queryIp] = { org: json.org, as: json.as, region: region, flagHtml: flagHtml, appName: appName };
+					geoIpCache[queryIp] = { org: json.org, as: json.as, region: region, flagHtml: flagHtml, appName: appName, appIcon: appIcon };
 					var targets = queuedIpMap[queryIp] || [];
 					targets.forEach(function(t) { applyGeoIpToDom(queryIp, t.srcId, t.dstId); });
 					delete queuedIpMap[queryIp];
@@ -482,7 +528,8 @@
 					appName = appMapper.getAppName(payload, geoIpCache[conn.dst], conn.bytes);
                                         if (appName) geoIpCache[conn.dst].appName = appName;
 				}
-				c7.innerHTML = c7.title = appName;
+				c7.innerHTML = appMapper.renderIcon(appMapper.iconifyIcon(appName), appName);
+				c7.title = appName;
 			}
 		});
 	}

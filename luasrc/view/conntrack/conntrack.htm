@@ -219,18 +219,31 @@ span.iconify {
 				return 'arcticons:china-telecom';
 			if (org.match(/china mobile/i))
 				return 'arcticons:china-mobile';
+			if (org.match(/alibaba/i))
+				return 'selfhst:alibaba';
 			if (org.match(/aliyun/i))
-				return 'ant-design:aliyun-outlined';
+				return 'thesvg-color:alibaba-cloud';
 			if (org.match(/baidu/i))
 				return 'selfhst:baidu';
 			if (org.match(/microsoft/i))
 				return 'arcticons:microsoft';
+			if (org.match(/amazon/i))
+				return 'selfhst:amazon';
 
 			return "";
 		},
 
-		renderIcon: function(icon, appName) {
-			if (!icon) return appName;
+		renderIcon: function(icon, appName, as) {
+			var as_code = "";
+			if (as) {
+				var m = as.match(/(AS\d+)/ig);
+				if (m) as_code = m[0];
+			}
+			function as_link(as_code, content) {
+				if (!as_code) return content;
+				return 	`<a href="https://ipinfo.io/${as_code}" target="_blank" style="color:#666;cursor:pointer;">${content}</a>`;
+			}
+			if (!icon) return as_link(as_code, appName);
 
 			if (typeof(Iconify) != 'undefined') {
 				if (!Iconify.iconExists(icon)) {
@@ -244,10 +257,10 @@ span.iconify {
 						cp = {}
 				}
 				var html = Iconify.renderHTML(icon, cp) || "";
-				if (html) return html;
+				if (html) return as_link(as_code, html);
 			}
 
-			return appName;
+			return as_link(as_code, appName);
 		},
 
 		getAppName: function(payload, geoInfo, bytes) {
@@ -415,7 +428,7 @@ span.iconify {
 							appIcon = appMapper.iconifyIcon(appName);
 							//if (appName && !(appName in appMapper)) appMapper[payload] = appName;
 							var payload_elems = document.querySelectorAll(`[payload="{payload}"]`);
-							payload_elems.forEach(function(elem) { elem.innerHTML = appMapper.renderIcon(appIcon, appName); elem.title = appName; });
+							payload_elems.forEach(function(elem) { elem.innerHTML = appMapper.renderIcon(appIcon, appName, json.as); elem.title = appName; });
 						}
 					}
 					geoIpCache[queryIp] = { org: json.org, as: json.as, region: region, flagHtml: flagHtml, appName: appName, appIcon: appIcon };
@@ -552,18 +565,20 @@ span.iconify {
 			var c7 = row.insertCell(7); c7.className = 'text-ellipsis ip-col-limit'; c7.style.display = showAppName ? '' : 'none';
 			var payload = conn.payload;
 			if (payload) {
-				var appName = "";
+				var appName = "", as = "";
 				c7.setAttribute("payload", payload);
 				if (appMapper[payload]) {
 			    		appName = appMapper[payload];
 				} else if (geoIpCache[conn.src]){ // Revise appName by conn.bytes
 					appName = appMapper.getAppName(payload, geoIpCache[conn.src], conn.bytes);
 					if (appName) geoIpCache[conn.src].appName = appName;
+					as = geoIpCache[conn.src].as;
 				} else if (geoIpCache[conn.dst]){ // Revise appName by conn.bytes
 					appName = appMapper.getAppName(payload, geoIpCache[conn.dst], conn.bytes);
                                         if (appName) geoIpCache[conn.dst].appName = appName;
+					as = geoIpCache[conn.dst].as;
 				}
-				c7.innerHTML = appMapper.renderIcon(appMapper.iconifyIcon(appName), appName);
+				c7.innerHTML = appMapper.renderIcon(appMapper.iconifyIcon(appName), appName, as);
 				c7.title = appName;
 			}
 		});

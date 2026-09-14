@@ -158,9 +158,9 @@ function action_stream()
 				)
 
 				if bytes1 and bytes2 then
-					-- NF_CONNTRACK module needs be patched for displaying payload
+					-- NF_CONNTRACK module needs be patched for displaying payload (any plain text or hex string)
 					local payload = ""
-					if remain2 then payload = remain2:match("payload=(%x+)") or "" end
+					if remain2 then payload = remain2:match("payload=(%S+)") or "" end
 
 					local display_proto = proto
 					if proto == "udp" and (sport1 == "443" or dport1 == "443" or sport2 == "443" or dport2 == "443") then

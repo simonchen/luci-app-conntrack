@@ -2,6 +2,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.3.2/css/flag-icons.min.css" />
 <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
 <script src="/luci-static/conntrack/js/iconify_custom_icons.js"></script>
+<script type="text/javascript" src="<%=pcdata(luci.dispatcher.build_url('admin', 'network', 'conntrack', 'conntrack_custom_js'))%>"></script>
+
 <style>
 span.iconify {
 	display:inline-block;
@@ -67,7 +69,12 @@ span.iconify {
 </style>
 
 <div class="cbi-map">
-	<h2 class="title"><%:ConnTrack%></h2>
+	<h2>
+		<ul class="cbi-tabmenu" style="border-bottom:0 !important;">
+		<li class="cbi-tab"><a href="<%=luci.dispatcher.build_url('admin/network/conntrack')%>"><strong><%:ConnTrack%></strong></a></li>
+		<li class="cbi-tab-disabled"><a href="<%=luci.dispatcher.build_url('admin/network/conntrack/conntrack_icons_config')%>"><%:Custom App Icons Config%></a></li>
+		</ul>
+	</h2>
 	<div class="cbi-map-descr"><%:Realtime single-direction traffic speed flow based on Event-Stream (SSE).%><br /><%:To show AppName, you'll need to patch kmod-nf-conntrack, please refers to%><a href="https://github.com/simonchen/luci-app-conntrack" target="_blank"> Github luci-app-conntrack</a></div>
 	
 	<fieldset class="cbi-section">
@@ -192,6 +199,14 @@ span.iconify {
 		iconifyIcon: function(org) {
 			if (!org) return "";
 
+			if (window._customIconRules && window._customIconRules.length > 0) {
+				for (var i = 0; i < window._customIconRules.length; i++) {
+					var rule = window._customIconRules[i];
+					if (org.match(rule.reg)) {
+						return rule.icon;
+					}
+				}
+			}
 			if (org.match(/<%:Honor of Kings%>/i))
 				return 'logos:honorofkings';
 			if (org.match(/telegram/i))
@@ -224,6 +239,8 @@ span.iconify {
 				return 'ant-design:bilibili-filled';
 			if (org.match(/<%:Bilibili Video%>/i))
 				return 'thesvg-color:bilibili';
+			if (org.match(/miui/i) || org.match(/xiaomi/i))
+				return 'thesvg-color:xiaomi';
 			if (org.match(/weixin/i))
 				return 'fa7-brands:weixin';
 			if (org.match(/v.*?\.qq\.com/i))
@@ -238,6 +255,8 @@ span.iconify {
 				return 'arcticons:china-mobile';
 			if (org.match(/alibaba/i))
 				return 'selfhst:alibaba';
+			if (org.match(/alipay/i))
+				return 'thesvg-color:alipay';
 			if (org.match(/aliyun/i))
 				return 'thesvg-color:alibaba-cloud';
 			if (org.match(/baidu/i))
@@ -297,8 +316,6 @@ span.iconify {
 		},
 
 		getAppName: function(payload, geoInfo, bytes) {
-			if (!payload) return "";
-
 			var isPayloadHexStr = isPureHexString(payload);
 			if (!isPayloadHexStr) { // domain - plain text
 				serverCache[payload] = true;
@@ -316,7 +333,8 @@ span.iconify {
 				if (this.isDomainHonorOfKings(payload) == 1)
 					return "<%:Honor of Kings%>";
 
-				return payload; // (i.e, the exact server name)
+				if (payload)
+					return payload; // (i.e, the exact server name)
 			}
 	
 			const prefix = payload.substring(0, 6);
@@ -333,7 +351,7 @@ span.iconify {
 				}
 			}
 
-			if (prefix === "160301" || prefix === "160303") { // HTTPS feature (443 port)
+			if (prefix === "160301" || prefix === "160303") { // TCP HTTPS feature (443 port)
 				if (org.includes("google") || org.includes("youtube")) {
 					if (bytes && bytes >= 4194304) { // at least 4MB to ensure..
 						return "<%:YouTube%>";
@@ -357,6 +375,12 @@ span.iconify {
 				if (org.includes("instagram") || org.includes("facebook") || org.includes("meta")) return "<%:Instagram%>";
 			
 				return org_as ? org_as : "<%:HTTPS Connection%>";
+			} else { // No prefix - UDP
+				if (org.includes("google") || org.includes("youtube")) {
+					if (bytes && bytes >= 4194304) { // at least 4MB to ensure..
+                                                return "<%:YouTube%>";
+                                        }
+				}
 			}
 			
 			return org_as ? org_as : "";
@@ -621,13 +645,15 @@ span.iconify {
 			var c6 = row.insertCell(6); c6.className = 'text-ellipsis'; c6.innerHTML = '<span style="color:#468847; font-weight:bold;">' + speedStr + '</span>'; c6.title = speedStr;
 
 			var c7 = row.insertCell(7); c7.className = 'text-ellipsis ip-col-limit'; c7.style.display = showAppName ? '' : 'none';
-			var payload = conn.payload;
+			var payload = conn.payload, appName = "", as = "";
 			if (payload) {
-				var appName = "", as = "";
 				c7.setAttribute("payload", payload);
 				if (appMapper[payload]) {
 			    		appName = appMapper[payload];
-				} else if (geoIpCache[conn.src]){ // Revise appName by conn.bytes
+				}
+			}
+			if (!appName) {
+				if (geoIpCache[conn.src]){ // Revise appName by conn.bytes
 					appName = appMapper.getAppName(payload, geoIpCache[conn.src], conn.bytes);
 					if (appName) geoIpCache[conn.src].appName = appName;
 					as = geoIpCache[conn.src].as;
@@ -636,9 +662,9 @@ span.iconify {
                                         if (appName) geoIpCache[conn.dst].appName = appName;
 					as = geoIpCache[conn.dst].as;
 				}
-				c7.innerHTML = appMapper.renderIcon(appMapper.iconifyIcon(appName), appName, as);
-				c7.title = appName;
 			}
+			c7.innerHTML = appMapper.renderIcon(appMapper.iconifyIcon(appName), appName, as);
+			c7.title = appName;
 		});
 	}
 

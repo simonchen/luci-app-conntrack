@@ -7,7 +7,7 @@ LUCI_PKGARCH:=all
 LUCI_MINIFY:=0
 
 PKG_NAME:=luci-app-conntrack
-PKG_VERSION:=1.0.2
+PKG_VERSION:=1.0.3
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=simonchen <xinyi78528@163.com>

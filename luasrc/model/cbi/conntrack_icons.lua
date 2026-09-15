@@ -1,4 +1,5 @@
 local i18n = require("luci.i18n")
+local nixio = require("nixio")
 
 local m = Map("conntrack", i18n.translate("Conntrack Custom App Icons"), i18n.translate("Manage your custom application regex mappings and SVG icons here. Note that the regex and icon mappings only apply to tracked TCP connections that successfully return a domain name for matching, and will not affect existing hardcoded rules (such as YouTube detection). Custom regex expressions and icon mappings will be matched with the highest priority based on their ranking order."))
 
@@ -106,7 +107,7 @@ end
 function b2.cfgvalue(self, section)
 	local value = Value.cfgvalue(self, section)
 	if value and value ~= "" then
-		local pcall_ok, decoded = pcall(base64_decode, value)
+		local pcall_ok, decoded = pcall(nixio.bin.b64decode, value)
 		if pcall_ok then
 			return decoded
 		end
@@ -119,7 +120,7 @@ function b2.validate(self, value)
 		if not value:match("^%s*<svg") then
 			return nil, i18n.translate("Invalid SVG content. Must start with <svg> tag.")
 		end
-		return base64_encode(value)
+		return nixio.bin.b64encode(value)
 	end
 	return value
 end

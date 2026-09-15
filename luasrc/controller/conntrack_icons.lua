@@ -40,7 +40,7 @@ function action_generate_js()
 
 	uci:foreach("conntrack", "my_custom_icons", function(s)
 		if s.name and s.svg_body then
-			local safe_svg = base64_decode(s.svg_body):gsub("[\r\n\t]", " ")
+			local safe_svg = nixio.bin.b64decode(s.svg_body):gsub("[\r\n\t]", " ")
 			table.insert(bundles, string.format("\t\t%q: { body: %q, width: %d, height: %d }", 
 				s.name, safe_svg, tonumber(s.width) or 24, tonumber(s.height) or 24))
 		end

@@ -5,7 +5,61 @@ function index()
 		return
 	end
 	entry({"admin", "network", "conntrack"}, template("conntrack/conntrack"), _("ConnTrack"), 90).dependent = true
+	entry({"admin", "network", "conntrack", "get_settings"}, call("action_get_settings"))
+	entry({"admin", "network", "conntrack", "set_settings"}, call("action_set_settings"))
 	entry({"admin", "network", "conntrack_stream"}, call("action_stream")).dependent = true
+end
+
+function action_get_settings()
+	local uci = require("luci.model.uci").cursor()
+	local jsonc = require("luci.jsonc")
+	luci.http.prepare_content("application/json")
+	
+	local res = {
+		interval = uci:get("conntrack", "settings", "interval") or "1500",
+		rows = uci:get("conntrack", "settings", "rows") or "50",
+		filter_local = uci:get("conntrack", "settings", "filter_local") or "true",
+		show_appname = uci:get("conntrack", "settings", "show_appname") or "false"
+	}
+	luci.http.write(jsonc.stringify(res))
+end
+
+function action_set_settings()
+	local uci = require("luci.model.uci").cursor()
+	local jsonc = require("luci.jsonc")
+	luci.http.prepare_content("application/json")
+	
+	local raw_body = luci.http.content()
+	if raw_body then
+		local data = jsonc.parse(raw_body)
+		if data and type(data) == "table" then
+			local has_settings = false
+			uci:foreach("conntrack", "global", function(s)
+				if s[".name"] == "settings" then
+					has_settings = true
+					return false
+				end
+			end)
+			
+			if not has_settings then
+				uci:section("conntrack", "global", "settings")
+			end
+			
+			if data.interval then uci:set("conntrack", "settings", "interval", tostring(data.interval)) end
+			if data.rows then uci:set("conntrack", "settings", "rows", tostring(data.rows)) end
+			if data.filter_local ~= nil then uci:set("conntrack", "settings", "filter_local", tostring(data.filter_local)) end
+			if data.show_appname ~= nil then uci:set("conntrack", "settings", "show_appname", tostring(data.show_appname)) end
+			
+			local commit_ok = uci:commit("conntrack")
+			if commit_ok then
+				luci.http.write('{"status":"ok"}')
+			else
+				luci.http.write('{"status":"commit_failed"}')
+			end
+			return
+		end
+	end
+	luci.http.write('{"status":"error"}')
 end
 
 function action_stream()

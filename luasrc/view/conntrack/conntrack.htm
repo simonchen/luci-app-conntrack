@@ -782,5 +782,98 @@ span.iconify {
 
 	window.addEventListener('DOMContentLoaded', startStream);
 //]]></script>
+<script type="text/javascript">//<![CDATA[
+(function() {
+	var getUrl = "<%=luci.dispatcher.build_url('admin/network/conntrack/get_settings')%>";
+	var setUrl = "<%=luci.dispatcher.build_url('admin/network/conntrack/set_settings')%>";
+	
+	var activeTimer = null;
+	
+	var elements = {
+		interval: document.getElementById("interval_select"),
+		rows: document.getElementById("rows_select"),
+		filter_local: document.getElementById("filter_local_checkbox"),
+		show_appname: document.getElementById("show_appname_checkbox")
+	};
+
+	window.conntrack_settings = {
+		interval: 1.5,
+		rows: 50,
+		filter_local: true,
+		show_appname: false
+	};
+
+	var loadSavedSettings = function() {
+		fetch(getUrl, { method: "GET", cache: "no-cache" })
+			.then(function(res) { return res.json(); })
+			.then(function(config) {
+				if (config) {
+					window.conntrack_settings.interval = parseFloat(config.interval) || 1.5;
+					window.conntrack_settings.rows = parseInt(config.rows) || 50;
+					window.conntrack_settings.filter_local = (config.filter_local === "true");
+					window.conntrack_settings.show_appname = (config.show_appname === "true");
+
+					if (elements.interval) elements.interval.value = config.interval;
+					if (elements.rows) elements.rows.value = config.rows;
+					if (elements.filter_local) {
+						if (elements.filter_local.type === "checkbox") elements.filter_local.checked = window.conntrack_settings.filter_local;
+						else elements.filter_local.value = config.filter_local;
+					}
+					if (elements.show_appname) {
+						if (elements.show_appname.type === "checkbox") elements.show_appname.checked = window.conntrack_settings.show_appname;
+						else elements.show_appname.value = config.show_appname;
+					}
+
+					if (typeof window.startStream === "function") {
+						window.startStream();
+					}
+				}
+			})
+			.catch(function() {});
+	};
+
+	var bindAutoSyncEvents = function() {
+		var postUpdate = function() {
+			var payload = {
+				interval: elements.interval ? elements.interval.value : "1500",
+				rows: elements.rows ? elements.rows.value : "50",
+				filter_local: elements.filter_local ? (elements.filter_local.type === "checkbox" ? elements.filter_local.checked : elements.filter_local.value === "true") : true,
+				show_appname: elements.show_appname ? (elements.show_appname.type === "checkbox" ? elements.show_appname.checked : elements.show_appname.value === "true") : false
+			};
+
+			window.conntrack_settings.interval = parseFloat(payload.interval);
+			window.conntrack_settings.rows = parseInt(payload.rows);
+			window.conntrack_settings.filter_local = (payload.filter_local === true || payload.filter_local === "true");
+			window.conntrack_settings.show_appname = (payload.show_appname === true || payload.show_appname === "true");
+
+			fetch(setUrl, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(payload)
+			})
+			.then(function(res) { return res.json(); })
+			.then(function(data) {
+				if (data && data.status === "ok" && typeof window.startStream === "function") {
+					// window.startStream(); // have been processed (see above individual event handler)
+				}
+			})
+			.catch(function() {});
+		};
+
+		for (var key in elements) {
+			if (elements.hasOwnProperty(key) && elements[key]) {
+				var evType = (elements[key].type === "checkbox" || elements[key].tagName === "SELECT") ? "change" : "input";
+				elements[key].addEventListener(evType, postUpdate);
+			}
+		}
+	};
+
+	document.addEventListener("DOMContentLoaded", function() {
+		loadSavedSettings();
+		bindAutoSyncEvents();
+	});
+})();
+//]]></script>
+</script>
 <%+footer%>
 

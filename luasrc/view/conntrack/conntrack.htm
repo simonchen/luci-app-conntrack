@@ -273,7 +273,7 @@ span.iconify {
 				return 'arcticons:microsoft';
 			if (org.match(/^bing\./i) || org.match(/\.bing\./i))
 				return 'logos:bing';
-			if (org.match(/\.intel\.com/i))
+			if (org.match(/\.intel\./i))
 				return 'thesvg-color:intel';
 			if (org.match(/nvidia/i))
 				return 'logos:nvidia';
@@ -307,8 +307,9 @@ span.iconify {
 				var icon_data = Iconify.getIcon(icon);
 				if (icon_data) {
 					if (icon_data.width/icon_data.height >= 2 ||
-						icon_data.height/icon_data.width >= 2)
-						cp = {}
+						icon_data.height/icon_data.width >= 2) {
+						cp = {};
+					}
 				}
 				var html = Iconify.renderHTML(icon, cp) || "";
 				if (html) return as_link(as_code, html);

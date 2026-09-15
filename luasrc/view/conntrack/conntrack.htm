@@ -207,6 +207,8 @@ span.iconify {
 					}
 				}
 			}
+			if (org.match(/<%:PCDN Stream Media%>/i))
+				return 'glyphs-poly:stream';
 			if (org.match(/<%:Honor of Kings%>/i))
 				return 'logos:honorofkings';
 			if (org.match(/telegram/i))
@@ -375,11 +377,15 @@ span.iconify {
 				if (org.includes("instagram") || org.includes("facebook") || org.includes("meta")) return "<%:Instagram%>";
 			
 				return org_as ? org_as : "<%:HTTPS Connection%>";
-			} else { // No prefix - UDP
+			} else { // Non HTTPS connection 
 				if (org.includes("google") || org.includes("youtube")) {
 					if (bytes && bytes >= 4194304) { // at least 4MB to ensure..
                                                 return "<%:YouTube%>";
                                         }
+				}
+				// General steram media? (Current payload equals to previous cache's ?)
+				if (payload && (payload == geoInfo.payload) && bytes > 1000) {
+					return "<%:PCDN Stream Media (Tecent Video / BiliBili / iQiYi)%>";
 				}
 			}
 			
@@ -500,10 +506,10 @@ span.iconify {
 						var code = json.countryCode.toLowerCase();
 						flagHtml = '<span class="fi fi-' + code + ' ct-flag-inline"></span>';
 					}
-					var appName = "", appIcon = "";
+					var appName = "", appIcon = "", payload = "", bytes = "";
 					if (queuedIpMap[queryIp]) {
 						var arr = queuedIpMap[queryIp][0].payload.split('|');
-						var payload = arr[0], bytes = arr[1];
+						payload = arr[0], bytes = arr[1];
 						if (payload) {
 							appName = appMapper[payload];
 							if (!appName) appName = appMapper.getAppName(payload, json, bytes);
@@ -513,7 +519,7 @@ span.iconify {
 							payload_elems.forEach(function(elem) { elem.innerHTML = appMapper.renderIcon(appIcon, appName, json.as); elem.title = appName; });
 						}
 					}
-					geoIpCache[queryIp] = { org: json.org, as: json.as, region: region, flagHtml: flagHtml, appName: appName, appIcon: appIcon };
+					geoIpCache[queryIp] = { org: json.org, as: json.as, region: region, flagHtml: flagHtml, appName: appName, appIcon: appIcon, payload: payload };
 					var targets = queuedIpMap[queryIp] || [];
 					targets.forEach(function(t) { applyGeoIpToDom(queryIp, t.srcId, t.dstId); });
 					delete queuedIpMap[queryIp];

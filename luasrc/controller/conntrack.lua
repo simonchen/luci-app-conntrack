@@ -226,9 +226,9 @@ function action_stream()
 				      else
 					if layer3 == "ipv4" then
 						-- IPv4 DNAT revert --
-						if src2 == lan_ip or src2 == '127.0.0.1' then src2 = dst1 end
+						if src2 == lan_ip or src2 == '127.0.0.1' then src2 = dst1 sport2 = dport1 end
 						-- IPv4 SNAT revert --
-						if dst2 ~= src1 then dst2 = src1 end
+						if dst2 ~= src1 then dst2 = src1 dport2 = sport1 end
 					end
 
 					ip_map[src1] = true

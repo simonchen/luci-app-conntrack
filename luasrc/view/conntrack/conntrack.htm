@@ -317,7 +317,7 @@ span.iconify {
 			return as_link(as_code, appName);
 		},
 
-		getAppName: function(payload, geoInfo, bytes) {
+		getAppName: function(payload, geoInfo, proto, bytes) {
 			var isPayloadHexStr = isPureHexString(payload);
 			if (!isPayloadHexStr) { // domain - plain text
 				serverCache[payload] = true;
@@ -384,8 +384,8 @@ span.iconify {
                                         }
 				}
 				// General steram media? (Current payload equals to previous cache's ?)
-				if (payload && (payload == geoInfo.payload) && bytes > 1000) {
-					return "<%:PCDN Stream Media (Tecent Video / BiliBili / iQiYi)%>";
+				if (payload && (payload == geoInfo.payload) && proto && proto.toLowerCase() == 'udp' && bytes > 1000) {
+					return "<%:PCDN Stream Media%>";
 				}
 			}
 			
@@ -509,10 +509,10 @@ span.iconify {
 					var appName = "", appIcon = "", payload = "", bytes = "";
 					if (queuedIpMap[queryIp]) {
 						var arr = queuedIpMap[queryIp][0].payload.split('|');
-						payload = arr[0], bytes = arr[1];
+						payload = arr[0], proto = arr[1], bytes = arr[2];
 						if (payload) {
 							appName = appMapper[payload];
-							if (!appName) appName = appMapper.getAppName(payload, json, bytes);
+							if (!appName) appName = appMapper.getAppName(payload, json, proto, bytes);
 							appIcon = appMapper.iconifyIcon(appName);
 							//if (appName && !(appName in appMapper)) appMapper[payload] = appName;
 							var payload_elems = document.querySelectorAll(`[payload="{payload}"]`);
@@ -644,8 +644,8 @@ span.iconify {
 			if (geoIpCache[conn.src]) { applyGeoIpToDom(conn.src, src_dom_id, dst_dom_id); }
 			if (geoIpCache[conn.dst]) { applyGeoIpToDom(conn.dst, src_dom_id, dst_dom_id); }
 
-			if (!src_host) { fetchGeoIp(conn.src, src_dom_id, dst_dom_id, conn.payload+'|'+conn.bytes); }
-			if (!dst_host) { fetchGeoIp(conn.dst, src_dom_id, dst_dom_id, conn.payload+'|'+conn.bytes); }
+			if (!src_host) { fetchGeoIp(conn.src, src_dom_id, dst_dom_id, conn.payload+'|'+conn.proto+'|'+conn.bytes); }
+			if (!dst_host) { fetchGeoIp(conn.dst, src_dom_id, dst_dom_id, conn.payload+'|'+conn.proto+'|'+conn.bytes); }
 	
 			var c5 = row.insertCell(5); c5.className = 'text-ellipsis'; c5.innerHTML = formatBytes(conn.bytes); c5.title = formatBytes(conn.bytes);
 			var c6 = row.insertCell(6); c6.className = 'text-ellipsis'; c6.innerHTML = '<span style="color:#468847; font-weight:bold;">' + speedStr + '</span>'; c6.title = speedStr;
@@ -660,11 +660,11 @@ span.iconify {
 			}
 			if (!appName) {
 				if (geoIpCache[conn.src]){ // Revise appName by conn.bytes
-					appName = appMapper.getAppName(payload, geoIpCache[conn.src], conn.bytes);
+					appName = appMapper.getAppName(payload, geoIpCache[conn.src], conn.proto, conn.bytes);
 					if (appName) geoIpCache[conn.src].appName = appName;
 					as = geoIpCache[conn.src].as;
 				} else if (geoIpCache[conn.dst]){ // Revise appName by conn.bytes
-					appName = appMapper.getAppName(payload, geoIpCache[conn.dst], conn.bytes);
+					appName = appMapper.getAppName(payload, geoIpCache[conn.dst], conn.proto, conn.bytes);
                                         if (appName) geoIpCache[conn.dst].appName = appName;
 					as = geoIpCache[conn.dst].as;
 				}

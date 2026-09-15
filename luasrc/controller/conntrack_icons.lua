@@ -75,7 +75,12 @@ function action_generate_js()
 		if (iconName && window.Iconify && typeof window.Iconify.getIcon === "function") {
 			var iconObj = window.Iconify.getIcon(iconName);
 			if (iconObj && iconObj.body) {
-				span.innerHTML = '<svg xmlns="http://w3.org" viewBox="0 0 ' + (iconObj.width || 24) + ' ' + (iconObj.height || 24) + '" width="24" height="24" style="vertical-align:middle;">' + iconObj.body + '</svg>';
+				var iw = 48, ih = 48;
+				if (iconObj.width/iconObj.height > 2 ||
+					iconObj.height/iconObj.width > 2) {
+					iw = ""; ih = "";
+				}
+				span.innerHTML = '<svg xmlns="http://w3.org" viewBox="0 0 ' + (iconObj.width || 24) + ' ' + (iconObj.height || 24) + '" width="' + iw + '" height="' + ih + '" style="vertical-align:middle;">' + iconObj.body + '</svg>';
 			}
 		}
 	});

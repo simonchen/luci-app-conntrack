@@ -331,7 +331,7 @@ span.iconify {
 					return "<%:Gmail%>";
 				if (payload.match(/skype/i))
 					return "<%:Skype%>";
-				if (payload.match(/teams\.microsoft/i))
+				if (payload.match(/teams\.microsoft/i) || payload.match(/teams\.live\./i))
 					return "<%:Microsoft Teams%>";
 				if (this.isDomainHonorOfKings(payload) == 1)
 					return "<%:Honor of Kings%>";

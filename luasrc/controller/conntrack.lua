@@ -62,6 +62,43 @@ function action_set_settings()
 	luci.http.write('{"status":"error"}')
 end
 
+local function nixio_lines_fast(path)
+	local nixio = require("nixio")
+	local fd = nixio.open(path, "r")
+	if not fd then return function() return nil end end
+
+	local chunks = {}
+	while true do
+		local chunk = fd:read(65536)
+		if not chunk or #chunk == 0 then break end
+		table.insert(chunks, chunk)
+	end
+	fd:close()
+
+	local content = table.concat(chunks)
+	local pos = 1
+	local content_len = #content
+
+	return function()
+		if pos > content_len then
+			return nil
+		end
+
+		local newline = content:find("\n", pos, true)
+		if newline then
+			local line = content:sub(pos, newline - 1)
+			pos = newline + 1
+			if #line > 0 and line:sub(-1) == "\r" then line = line:sub(1, -2) end
+			return line
+		else
+			local line = content:sub(pos)
+			pos = content_len + 1
+			if #line > 0 and line:sub(-1) == "\r" then line = line:sub(1, -2) end
+			return #line > 0 and line or nil
+		end
+	end
+end
+
 function action_stream()
 	local nixio = require "nixio"
 	local jsonc = require "luci.jsonc"
@@ -196,26 +233,28 @@ function action_stream()
 		local current_connections = {}
 		local ip_map = {}
 		
-		local f = io.open("/proc/net/nf_conntrack", "r")
-		if not f then break end
+		-- local f = io.open("/proc/net/nf_conntrack", "r")
+		-- if not f then break end
 
-		for line in f:lines() do
-			local layer3, proto, remain = line:match("^(%w+)%s+%d+%s+(%w+)%s+(.*)$")
+		-- for line in f:lines() do
+		for line in nixio_lines_fast("/proc/net/nf_conntrack") do
+			local s_end = line:find("src=", 1, true)
+			local has_state = true
+			local remain = ""
+			local payload = ""
+			if s_end and line:byte(s_end-2) >= 48 and line:byte(s_end-2) <= 57 then
+				has_state = false
+			end
+			if has_state then
+				layer3, proto, state, src1, dst1, sport1, dport1, bytes1, src2, dst2, sport2, dport2, bytes2, remain = line:match("^(%w+)%s+%d+%s+(%w+)%s+%d+%s+%d+%s+(%S+)%s+src=([%a%d%.%:]+)%s+dst=([%a%d%.%:]+)%s+sport=(%d+)%s+dport=(%d+).-bytes=(%d+).-src=([%a%d%.%:]+)%s+dst=([%a%d%.%:]+)%s+sport=(%d+)%s+dport=(%d+).-bytes=(%d+)(.*)")
+			else
+				state = 'UNTRACKED'	
+				layer3, proto, src1, dst1, sport1, dport1, bytes1, src2, dst2, sport2, dport2, bytes2, remain = line:match("^(%w+)%s+%d+%s+(%w+)%s+%d+%s+%d+%s+src=([%a%d%.%:]+)%s+dst=([%a%d%.%:]+)%s+sport=(%d+)%s+dport=(%d+).-bytes=(%d+).-src=([%a%d%.%:]+)%s+dst=([%a%d%.%:]+)%s+sport=(%d+)%s+dport=(%d+).-bytes=(%d+)(.*)")
+			end
+			if remain then payload = remain:match("payload=(%S+)") or "" end
+
 			if layer3 and (proto == "tcp" or proto == "udp") then
-				local state = "UNTRACKED"
-				if proto == "tcp" then
-					state = remain:match("^%d+%s+%d+%s+([%w_]+)") or "UNKNOWN"
-				end
-
-				local src1, dst1, sport1, dport1, bytes1, src2, dst2, sport2, dport2, bytes2, remain2 = remain:match(
-					"src=([%a%d%.%:]+).-dst=([%a%d%.%:]+).-sport=(%d+).-dport=(%d+).-bytes=(%d+).-src=([%a%d%.%:]+).-dst=([%a%d%.%:]+).-sport=(%d+).-dport=(%d+).-bytes=(%d+)%s+(.*)$"
-				)
-
 				if bytes1 and bytes2 then
-					-- NF_CONNTRACK module needs be patched for displaying payload (any plain text or hex string)
-					local payload = ""
-					if remain2 then payload = remain2:match("payload=(%S+)") or "" end
-
 					local display_proto = proto
 					if proto == "udp" and (sport1 == "443" or dport1 == "443" or sport2 == "443" or dport2 == "443") then
 						display_proto = "quic"
@@ -246,6 +285,7 @@ function action_stream()
 							l3 = layer3, proto = display_proto, state = state,
 							src = src1, sport = sport1, dst = dst1, dport = dport1, bytes = tonumber(bytes1), speed = 0, payload = payload
 						}
+						table.insert(current_connections, current_connections[key_orig])
 					end
 
 					local pass_repl = true
@@ -258,12 +298,14 @@ function action_stream()
 							l3 = layer3, proto = display_proto, state = state,
 							src = src2, sport = sport2, dst = dst2, dport = dport2, bytes = tonumber(bytes2), speed = 0, payload = payload
 						}
+						table.insert(current_connections, current_connections[key_repl])
 					end
 				      end
 				end
 			end
 		end
-		f:close()
+		-- f:close()
+		local lines_proc_time = get_current_time() - current_timestamp
 
 		local delta_time = current_timestamp - last_timestamp
 		if delta_time > 0 then
@@ -273,21 +315,18 @@ function action_stream()
 					local diff = curr.bytes - prev.bytes
 					curr.speed = diff >= 0 and math.floor(diff / delta_time) or 0
 				else
-					if curr.proto == "udp" or curr.proto == "quic" then
-						curr.speed = math.floor(curr.bytes / delta_time) or 0
-					else
-						curr.speed = 0
-					end
+					curr.speed = 0
 				end
 			end
 		end
 
-		local sorted_list = {}
-		for _, conn in pairs(current_connections) do
+		local sorted_list = current_connections
+		-- local sorted_list = {}
+		-- for _, conn in pairs(current_connections) do
 			-- if conn.speed > 0 then
-				table.insert(sorted_list, conn)
+		--		table.insert(sorted_list, conn)
 			-- end
-		end
+		-- end
 
 		table.sort(sorted_list, function(a, b) return a.speed > b.speed end)
 
@@ -320,6 +359,7 @@ function action_stream()
 		for _, ip in ipairs(v6_ips) do table.insert(unique_ips, ip) end
 
 		local response = {
+			lines_proc_time = string.format("%.2f", lines_proc_time),
 			delta = string.format("%.2f", delta_time),
 			connections = output_list,
 			unique_ips = unique_ips,

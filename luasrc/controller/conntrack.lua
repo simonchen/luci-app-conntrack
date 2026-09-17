@@ -223,6 +223,7 @@ function action_stream()
 
 	local last_connections = {}
 	local last_timestamp = get_current_time()
+	local layer3, proto, state, src1, dst1, sport1, dport1, bytes1, src2, dst2, sport2, dport2, bytes2, remain
 
 	while true do
 		local sec = math.floor(interval / 1000)
@@ -373,6 +374,10 @@ function action_stream()
 		end)
 
 		if not ok then break end
+
+		if luci.http.getenv("HTTP_CONNECTION") == "close" then
+                        break
+                end
 
 		last_connections = current_connections
 		last_timestamp = current_timestamp
